@@ -13,7 +13,7 @@ browser tab. Free to use, including commercially.
 
 ## Download
 
-**[Download StreamLens.exe](https://github.com/getaxtools/StreamLens/releases/download/v0.1.0/StreamLens.exe)**
+**[Download StreamLens.exe](https://github.com/getaxtools/StreamLens/releases/download/v0.2.0/StreamLens.exe)**
 — Windows, 75 MB, single self-contained file. Or browse all builds on the
 [Releases page](https://github.com/getaxtools/StreamLens/releases).
 
