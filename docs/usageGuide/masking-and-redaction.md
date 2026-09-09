@@ -368,7 +368,6 @@ Replace:    Redact
 
 ## Related
 
-- [Usage Guide index](usageguide.md)
-- [Publishing messages](publishing-messages.md) — pre-flight schema validation
-- Product spec: `../streamlens-studio-spec.md` §3.6
-- Security posture: `../security-audit.md`
+- [User Guide](../usage_guide.md) — the full walkthrough, including
+  [publishing messages](../usage_guide.md#5-publishing-a-message)
+- [Your data and security](../usage_guide.md#8-your-data-and-security)

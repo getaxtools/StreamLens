@@ -1,0 +1,160 @@
+StreamLens Studio — End User License Agreement
+
+Copyright (c) 2026 GetAx Tools. All rights reserved.
+
+This End User License Agreement ("Agreement") is a legal agreement between you
+(either an individual or a single entity, "you") and GetAx Tools ("we", "us")
+governing your use of StreamLens Studio, including its executable files,
+associated media, and documentation (the "Software").
+
+BY DOWNLOADING, INSTALLING, OR USING THE SOFTWARE, YOU AGREE TO BE BOUND BY THE
+TERMS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT DOWNLOAD, INSTALL, OR USE
+THE SOFTWARE.
+
+1. GRANT OF LICENSE
+
+Subject to your compliance with this Agreement, we grant you a perpetual,
+worldwide, royalty-free, non-exclusive, non-transferable license to install and
+use the Software:
+
+  (a) for any purpose, including commercial and internal business use;
+  (b) on any number of devices you own or control;
+  (c) by any number of individuals within your organization.
+
+No registration, account, seat license, or fee is required. There is no trial
+period and no expiration.
+
+2. RESTRICTIONS
+
+Except to the extent the following restrictions are prohibited by applicable
+law, or expressly permitted by the third-party license terms referenced in
+Section 4, you may not:
+
+  (a) distribute, sublicense, rent, lease, lend, sell, or resell the Software,
+      or make it available to third parties as part of a commercial offering
+      or service bureau;
+  (b) modify, adapt, translate, or create derivative works of the Software;
+  (c) reverse engineer, decompile, or disassemble the Software, or otherwise
+      attempt to derive its source code;
+  (d) remove, obscure, or alter any copyright, trademark, or other proprietary
+      notice contained in the Software;
+  (e) use the Software in violation of applicable law, or to access systems or
+      data you are not authorized to access.
+
+Internal redistribution within your own organization — for example, deploying
+the Software to your colleagues' workstations — is permitted and is not
+considered distribution under Section 2(a).
+
+3. OWNERSHIP
+
+The Software is licensed, not sold. We retain all right, title, and interest in
+and to the Software, including all intellectual property rights. The source
+code of the Software is not published, and no rights to it are granted under
+this Agreement. All rights not expressly granted here are reserved.
+
+4. THIRD-PARTY COMPONENTS
+
+The Software incorporates third-party open-source components, each licensed
+under its own terms. Those terms are reproduced in the accompanying
+THIRD-PARTY-NOTICES.md file and govern your use of those components. Where a
+third-party license grants you rights broader than this Agreement with respect
+to that component, those broader rights apply to that component.
+
+5. NO SECURITY BOUNDARY
+
+The Software includes masking and redaction features intended to keep sensitive
+values off your screen and out of exported files. These are display and export
+hygiene features. They are NOT a security boundary, NOT an access control, and
+NOT a compliance control: the Software receives complete message payloads from
+your Kafka brokers, and masking is applied only at the point of display or
+export. You are responsible for determining whether the Software is appropriate
+for use with regulated, confidential, or personal data, and for any controls
+required by law or contract.
+
+6. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, ACCURACY, AND
+NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SOFTWARE WILL BE UNINTERRUPTED,
+ERROR-FREE, OR SECURE, THAT DEFECTS WILL BE CORRECTED, OR THAT IT IS SUITABLE
+FOR USE WITH PRODUCTION SYSTEMS OR SENSITIVE DATA.
+
+The Software connects to Apache Kafka clusters and can perform actions that
+change or destroy data, including creating and deleting topics and publishing
+messages. YOU ARE SOLELY RESPONSIBLE FOR VERIFYING WHICH CLUSTER YOU ARE
+CONNECTED TO AND FOR THE CONSEQUENCES OF ACTIONS YOU TAKE THROUGH THE SOFTWARE.
+You are responsible for maintaining backups of any data you value.
+
+7. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL WE BE
+LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR
+CONSEQUENTIAL DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA, DATA USE,
+GOODWILL, OR BUSINESS INTERRUPTION, ARISING OUT OF OR RELATING TO THIS
+AGREEMENT OR THE SOFTWARE, HOWEVER CAUSED AND UNDER ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR
+OTHERWISE, AND EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, OUR TOTAL CUMULATIVE
+LIABILITY ARISING OUT OF OR RELATING TO THIS AGREEMENT OR THE SOFTWARE SHALL
+NOT EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID US FOR THE SOFTWARE, OR
+(B) FIFTY UNITED STATES DOLLARS (USD $50).
+
+BECAUSE THE SOFTWARE IS PROVIDED FREE OF CHARGE, THESE LIMITATIONS ARE A
+FUNDAMENTAL BASIS OF THIS AGREEMENT AND APPLY EVEN IF ANY LIMITED REMEDY FAILS
+OF ITS ESSENTIAL PURPOSE.
+
+Some jurisdictions do not allow the exclusion of implied warranties or the
+limitation of liability for incidental or consequential damages, so some of the
+above exclusions and limitations may not apply to you. In such jurisdictions,
+our liability is limited to the greatest extent permitted by law. Nothing in
+this Agreement excludes or limits liability for death or personal injury caused
+by negligence, for fraud or fraudulent misrepresentation, or for any other
+liability that cannot be excluded or limited under applicable law.
+
+8. PRE-RELEASE SOFTWARE
+
+The Software is pre-release and under active development. It may contain
+defects, and its features, data formats, and behavior may change without notice
+between releases. Pre-release software is particularly unsuitable for use in
+production environments without independent verification.
+
+9. NO SUPPORT OBLIGATION
+
+We have no obligation under this Agreement to provide support, maintenance,
+updates, or new versions. Any support we do provide is at our discretion and
+does not create an ongoing obligation.
+
+10. PRIVACY
+
+The Software runs locally on your device. Cluster connection profiles, masking
+rules, preferences, and audit events are stored in a local database on your
+device, and connection secrets are stored using the operating system's
+credential protection facilities. We do not collect, transmit, or receive your
+message data, credentials, or cluster configuration.
+
+11. TERMINATION
+
+This Agreement is effective until terminated. It terminates automatically if
+you breach any of its terms. Upon termination you must cease all use of the
+Software and destroy all copies in your possession. Sections 3, 5, 6, 7, and 12
+survive termination.
+
+12. GENERAL
+
+This Agreement constitutes the entire agreement between you and us regarding
+the Software and supersedes all prior or contemporaneous understandings on the
+subject. If any provision is held unenforceable, that provision will be limited
+or eliminated to the minimum extent necessary and the remaining provisions
+remain in full force. Our failure to enforce any provision is not a waiver of
+our right to do so later. You may not assign this Agreement without our prior
+written consent.
+
+We may release future versions of the Software under different terms. Any
+change to these terms applies only to versions released after the change; the
+version you have received remains governed by the Agreement accompanying it.
+
+13. CONTACT
+
+Questions about this Agreement: https://github.com/getaxtools/StreamLens/issues

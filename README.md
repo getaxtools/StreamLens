@@ -20,9 +20,12 @@ browser tab. Free to use, including commercially.
 No installer, no account, no configuration — download, run, and add your
 first cluster connection.
 
-> Windows may show a SmartScreen warning on first run, since the build isn't
-> code-signed yet. Choose **More info → Run anyway** if you're happy to
-> proceed.
+> Windows shows a SmartScreen warning on first run: the build is signed, but
+> with a self-signed certificate rather than one from a certificate authority,
+> so Windows can't vouch for it. Choose **More info → Run anyway** if you're
+> happy to proceed. To confirm your download is the file that was published,
+> check its SHA-256 hash against the release notes — see
+> [Verifying your download](docs/verification/README.md).
 
 New here? The [user guide](docs/usage_guide.md) walks through connecting to a
 cluster and reading your first messages.
@@ -105,6 +108,10 @@ attaching it to a bug report.
   searching, publishing, exporting, and what the app stores on your machine
 - [Masking and redaction](docs/usageGuide/masking-and-redaction.md) — how to
   write and test redaction rules
+- [Verifying your download](docs/verification/README.md) — checking the
+  SHA-256 hash, and what the code signature does and doesn't prove
+- [Local Kafka sandbox](docker/README.md) — a disposable single-node cluster
+  with seeded topics, for trying the app out
 
 ## Bugs and feature requests
 
@@ -124,3 +131,6 @@ machines as you like — no seat limits, no registration, no trial period.
 
 It is proprietary software: the source code isn't published, and the app may
 not be redistributed or resold. Full terms in [LICENSE](LICENSE).
+
+StreamLens Studio bundles third-party open-source components; their licenses
+are reproduced in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

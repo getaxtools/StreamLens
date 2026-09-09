@@ -4,8 +4,8 @@
 messages arrive live, search them, hide sensitive fields, and publish test
 messages — without writing a line of code.
 
-This guide is for using the app. If you want to build it from source or
-contribute, see the [README](../README.md).
+This guide is for using the app. For downloads, feature overview, and known
+limitations, see the [README](../README.md).
 
 ---
 
@@ -29,9 +29,15 @@ contribute, see the [README](../README.md).
 **You need Windows.** macOS and Linux aren't supported yet — the app won't
 start on them.
 
-Pre-built installers aren't published yet, so for now the app is built from
-source. Ask whoever set it up in your team, or follow the build steps in the
-[README](../README.md).
+**[Download StreamLens.exe](https://github.com/getaxtools/StreamLens/releases/latest)**
+from the Releases page — a single self-contained file. There's no installer:
+save it anywhere and run it.
+
+Windows shows a SmartScreen warning on first run, because the build isn't
+signed by a certificate authority. Choose **More info -> Run anyway** if you're
+happy to proceed. To confirm your download is the published file, check its
+SHA-256 hash against the release notes — see
+[Verifying your download](verification/README.md).
 
 **Nothing to configure and no account to create.** StreamLens runs entirely
 on your machine and talks only to the Kafka clusters you point it at.
