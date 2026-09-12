@@ -19,8 +19,9 @@ limitations, see the [README](../README.md).
 6. [Exporting messages](#6-exporting-messages)
 7. [Hiding sensitive data](#7-hiding-sensitive-data)
 8. [Your data and security](#8-your-data-and-security)
-9. [Settings](#9-settings)
-10. [Troubleshooting](#10-troubleshooting)
+9. [Keeping StreamLens up to date](#9-keeping-streamlens-up-to-date)
+10. [Settings](#10-settings)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -40,7 +41,10 @@ SHA-256 hash against the release notes — see
 [Verifying your download](verification/README.md).
 
 **Nothing to configure and no account to create.** StreamLens runs entirely
-on your machine and talks only to the Kafka clusters you point it at.
+on your machine. The only things it contacts are the Kafka clusters you point
+it at, and — once a day, to see whether a new version has been released —
+GitHub. That check sends nothing about you, and is covered in
+[Section 9](#9-keeping-streamlens-up-to-date).
 
 ---
 
@@ -55,7 +59,7 @@ You'll need these from whoever runs your Kafka cluster:
 
 ### Adding a connection
 
-1. Click **Add Cluster**.
+1. Open **File → Add Connection…**.
 2. Fill in:
 
    | Field | What to put |
@@ -66,6 +70,9 @@ You'll need these from whoever runs your Kafka cluster:
    | **Security Protocol** | `Plaintext` for a local test broker; otherwise ask your Kafka admin |
    | **SASL Mechanism** / **Username** | Only if your cluster requires a login |
    | **Schema Registry URL** | Optional — only if your team uses Avro |
+
+   Everything past the basics lives under **Advanced options**, collapsed
+   until you need it.
 
 3. Click **Connect**. The topic list fills in on the left.
 
@@ -89,11 +96,52 @@ You'll need these from whoever runs your Kafka cluster:
 built-in credential encryption, tied to your Windows account. See
 [Section 8](#8-your-data-and-security).
 
+### If your cluster uses TLS
+
+Most company clusters do. Choose `Ssl` or `SaslSsl` as the **Security
+Protocol** and a few more fields appear — they're hidden the rest of the
+time, because on an unencrypted connection they'd do nothing.
+
+What you need depends on how your cluster is set up, and your Kafka admin
+will know which of these applies:
+
+**The broker's certificate comes from your company's own authority.** Common
+in anything self-hosted. Windows doesn't trust that authority out of the box,
+so the connection fails until you point the **CA certificate** field at the
+CA file your admin gives you.
+
+**The broker wants a certificate from you too.** This is mutual TLS — the
+cluster won't talk to a client it can't identify. You'll be given a client
+certificate and a key file; fill in both. If the key has a passphrase, it
+goes in the Windows credential store rather than the connection file.
+
+**It's a dev broker you set up yourself and there's no CA file anywhere.**
+There's a **Skip certificate verification** checkbox for exactly this. It
+does what it says — nothing is checked, so nothing is really protected. Fine
+against a container on your laptop, never against anything else.
+
+### If your Schema Registry needs a login
+
+The registry is a separate service from the broker, and it has its own login.
+Filling in the SASL username and password doesn't cover it — that's the
+broker's login. There are separate **Schema Registry Username** and
+**Password** fields underneath the registry URL for this.
+
+Confluent Cloud works this way: the broker authenticates with SASL, the
+registry with a plain username and password. If the registry sits behind a
+private CA as well, it uses the same CA certificate you set above.
+
+Get this wrong and the symptom is confusing — the cluster connects fine and
+topics list normally, but Avro messages refuse to decode.
+
 ### Managing connections
 
-Connections are saved, so you set them up once. Under **File** you can
-**Export Connections…** to share your setup with a colleague, or **Import
-Connections…** to load theirs.
+Set a connection up once and it's saved. Everything to do with them sits in
+the **File** menu — **Connect to** lists the clusters you've saved, with
+**Add**, **Edit**, and **Delete Connection…** below it.
+
+Working with someone else on the same clusters? **Export Connections…**
+writes your setup to a file they can pick up with **Import Connections…**.
 
 **Exported connection files do not contain passwords** — whoever imports one
 enters their own credentials. That's deliberate: it means a connection file
@@ -257,9 +305,13 @@ rules](usageGuide/masking-and-redaction.md).
 
 ### Everything stays on your machine
 
-**No account, no cloud service, no telemetry.** StreamLens talks to your
-Kafka clusters and nothing else. Nobody — including the people who make it —
-can see your data or your connections.
+**No account, no cloud service, no telemetry.** Nobody — including the people
+who make it — can see your data or your connections.
+
+StreamLens makes exactly one kind of request that isn't to your own Kafka
+cluster: once a day it asks GitHub what the latest released version is. It
+sends nothing about you or your clusters, and you can read what it does and
+doesn't do in [Section 9](#9-keeping-streamlens-up-to-date).
 
 ### Kafka messages are never saved to disk
 
@@ -284,9 +336,15 @@ Deleting that folder resets the app to a fresh install.
 
 ### How your passwords are protected
 
-Cluster passwords go into Windows' built-in credential encryption (DPAPI),
-tied to your Windows user account. They are **never** written to the app's
-database, and never appear in exported connection files or in any log.
+Every secret the app holds goes to the same place: Windows' built-in
+credential encryption (DPAPI), tied to your Windows account. That covers
+cluster passwords, the passphrase on a certificate key, and your Schema
+Registry password. None of them are **ever** written to the app's database,
+and none appear in an exported connection file or in any log.
+
+Certificates are a slightly different case, because they're files you already
+have on disk. The app remembers *where* they are, and reads them when it
+connects — it never copies their contents into its own database.
 
 ### The audit log
 
@@ -329,7 +387,87 @@ messages and creates or deletes topics when you ask it to.
 
 ---
 
-## 9. Settings
+## 9. Keeping StreamLens up to date
+
+There's no installer and no auto-updater, so a new version means downloading
+a new `StreamLens.exe`. StreamLens tells you when there is one.
+
+### When an update exists
+
+On startup, StreamLens asks GitHub whether a newer version has been released.
+If one has, a small notice appears in the bottom-right corner:
+
+> **An update is available** — StreamLens v0.5.0 has been released.
+> [Not now] [Download]
+
+**Download** opens your browser and starts downloading the new
+`StreamLens.exe` straight away.
+
+**Not now** dismisses that version permanently — you won't be told about it
+again. You will still hear about the version after it.
+
+The notice doesn't block the app, and it doesn't disappear on its own. Leave
+it sitting there and deal with it when you're ready.
+
+### Checking on demand
+
+**Help → Check for Updates…** asks immediately rather than waiting for the
+daily check, and always answers in the status bar at the bottom: either that
+a version is available, that you're on the latest one, or that the check
+couldn't be completed.
+
+It also ignores anything you've previously dismissed, so it's the way to find
+a version you clicked **Not now** on earlier.
+
+### Installing the new version
+
+Close StreamLens, replace the old `StreamLens.exe` with the new one, and start
+it again. That's the whole process.
+
+**Your data carries over.** Connections, settings, per-topic preferences, and
+masking rules live in `%LocalAppData%\StreamLensStudio\`, separate from the
+executable, and the new version picks them up. You don't need to export
+anything first.
+
+Windows shows the SmartScreen warning again for each new file you download,
+for the same reason it does on first install.
+
+### What the check actually does
+
+Since this is the one part of StreamLens that talks to the internet, here is
+precisely what happens:
+
+- It requests one public GitHub address — the latest release for the
+  StreamLens repository. It's the same information you'd see by opening the
+  Releases page in a browser, and it needs no login.
+- **Nothing about you is sent.** No account, no licence key, no machine name,
+  no cluster addresses, no usage data. The request asks what the newest
+  version is; that's all of it.
+- It runs **at most once a day**, no matter how often you open the app.
+- Two things are remembered on your machine, in
+  `%LocalAppData%\StreamLensStudio\update-check.json`: when it last checked,
+  and which version you dismissed. Deleting that file costs you nothing.
+- **Nothing is downloaded or installed on its own.** StreamLens never replaces
+  itself or runs anything. **Download** hands a link to your browser, and that
+  is where its part ends.
+
+### If you're offline or GitHub is blocked
+
+Nothing happens, and nothing is shown. No error, no dialog, no delay when the
+app starts. This is deliberate: a machine with no internet access, a corporate
+proxy, or a network that blocks GitHub should be no different from any other,
+and a version notice isn't worth interrupting your work over.
+
+The automatic check is silent whether it succeeds or fails. If you want to
+know either way, use **Help → Check for Updates…**, which reports the failure
+rather than hiding it.
+
+If your network blocks GitHub permanently, the feature simply never does
+anything — there's nothing to switch off.
+
+---
+
+## 10. Settings
 
 **Tools → Settings…** covers app-wide defaults: your default format and start
 position for topics you haven't opened before, and whether timestamps display
@@ -341,7 +479,7 @@ default.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | What you see | What it usually means |
 |---|---|
@@ -349,10 +487,14 @@ default.
 | **The topic list is empty after connecting** | Check the bootstrap address for typos, and that you can reach the cluster from your network — a VPN is often the missing piece. |
 | **A topic shows no messages, but you know it has data** | Start position is **Latest**, which only shows recent activity. Switch to **Earliest** to replay from the beginning. |
 | **Messages look like unreadable symbols** | Wrong **Format**. Try `Json` or `String`. |
-| **Avro messages won't decode** | Either the Schema Registry URL is missing from the connection, or the topic isn't actually Avro — the error message distinguishes these. |
-| **Connection fails on a secured cluster** | The **Security Protocol** or **SASL Mechanism** doesn't match what the cluster expects. Confirm both with your Kafka admin. Never work around a certificate error by disabling verification — that defeats the encryption. |
+| **Avro messages won't decode** | Three possibilities: the Schema Registry URL is missing, the registry needs its own username and password ([Section 2](#2-connecting-to-a-cluster)), or the topic isn't actually Avro. The error message tells the last one apart from the others. |
+| **Connection fails on a secured cluster** | The **Security Protocol** or **SASL Mechanism** doesn't match what the cluster expects. Confirm both with your Kafka admin. |
+| **A certificate error, or the broker drops you mid-handshake** | Usually a missing **CA certificate**, or a cluster that wants a client certificate from you as well. Both are in [Section 2](#2-connecting-to-a-cluster). Don't reach for **Skip certificate verification** to make the error go away — it works, and it also throws away the protection you connected over TLS to get. |
 | **A field you masked is still visible** | Check the rule is enabled and its topic field either matches or is blank. Test the pattern in the rules dialog. |
 | **You can't delete a topic without typing its name** | Working as intended — the cluster is tagged **Production**. |
+| **"Couldn't check for updates"** | StreamLens can't reach GitHub — no internet, a proxy in the way, or GitHub itself is down. Nothing is wrong with the app, and the rest of it works normally. Try again later, or check the [Releases page](https://github.com/getaxtools/StreamLens/releases/latest) yourself. |
+| **You're never told about updates** | The automatic check is deliberately silent when it fails, so a blocked network looks the same as no new version. Use **Help → Check for Updates…**, which says which it is. |
+| **An update notice you dismissed won't come back** | **Not now** hides that version for good. **Help → Check for Updates…** ignores that and will find it again. |
 
 **Still stuck?** Open an issue on the project's GitHub repository. Include
 what you were doing, what you expected, and what happened. If you attach

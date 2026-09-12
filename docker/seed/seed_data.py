@@ -29,6 +29,68 @@ from confluent_kafka.serialization import MessageField, SerializationContext
 BOOTSTRAP_SERVERS = os.environ.get("BOOTSTRAP_SERVERS", "localhost:9092")
 SCHEMA_REGISTRY_URL = os.environ.get("SCHEMA_REGISTRY_URL", "http://schema-registry:8081")
 
+# Security settings, all optional. Unset means the plaintext dev stack, which is what
+# docker-compose.yml starts and how this script has always run; the TLS stack
+# (docker-compose.tls.yml) sets them to seed the same topics over SSL/mTLS instead.
+SECURITY_PROTOCOL = os.environ.get("SECURITY_PROTOCOL", "PLAINTEXT")
+SSL_CA_LOCATION = os.environ.get("SSL_CA_LOCATION", "")
+SSL_CERTIFICATE_LOCATION = os.environ.get("SSL_CERTIFICATE_LOCATION", "")
+SSL_KEY_LOCATION = os.environ.get("SSL_KEY_LOCATION", "")
+SASL_MECHANISM = os.environ.get("SASL_MECHANISM", "")
+SASL_USERNAME = os.environ.get("SASL_USERNAME", "")
+SASL_PASSWORD = os.environ.get("SASL_PASSWORD", "")
+SCHEMA_REGISTRY_USERNAME = os.environ.get("SCHEMA_REGISTRY_USERNAME", "")
+SCHEMA_REGISTRY_PASSWORD = os.environ.get("SCHEMA_REGISTRY_PASSWORD", "")
+SCHEMA_REGISTRY_CA_LOCATION = os.environ.get("SCHEMA_REGISTRY_CA_LOCATION", "")
+
+
+def kafka_config(**extra: object) -> dict:
+    """Base client config plus whatever security env vars are set.
+
+    Every Kafka client in this script goes through here so the plaintext and TLS stacks differ
+    only by environment, not by code path.
+    """
+    config: dict = {"bootstrap.servers": BOOTSTRAP_SERVERS}
+
+    if SECURITY_PROTOCOL and SECURITY_PROTOCOL != "PLAINTEXT":
+        config["security.protocol"] = SECURITY_PROTOCOL
+
+    if SSL_CA_LOCATION:
+        config["ssl.ca.location"] = SSL_CA_LOCATION
+
+    # Client certificate and key are a pair - one without the other can't complete a handshake.
+    if SSL_CERTIFICATE_LOCATION and SSL_KEY_LOCATION:
+        config["ssl.certificate.location"] = SSL_CERTIFICATE_LOCATION
+        config["ssl.key.location"] = SSL_KEY_LOCATION
+
+    # The broker certificate is issued to "localhost"/"kafka-tls", but this script reaches it by
+    # its compose service name, so leave hostname matching off rather than reissuing per caller.
+    if SECURITY_PROTOCOL in ("SSL", "SASL_SSL"):
+        config["ssl.endpoint.identification.algorithm"] = "none"
+
+    if SASL_MECHANISM:
+        config["sasl.mechanism"] = SASL_MECHANISM
+        config["sasl.username"] = SASL_USERNAME
+        config["sasl.password"] = SASL_PASSWORD
+
+    config.update(extra)
+    return config
+
+
+def schema_registry_config() -> dict:
+    """Registry config - separate credentials from the broker's, since it's a separate service."""
+    config: dict = {"url": SCHEMA_REGISTRY_URL}
+
+    if SCHEMA_REGISTRY_USERNAME and SCHEMA_REGISTRY_PASSWORD:
+        # This client takes basic.auth.user.info on its own - passing the
+        # basic.auth.credentials.source key alongside it is rejected as unrecognized.
+        config["basic.auth.user.info"] = f"{SCHEMA_REGISTRY_USERNAME}:{SCHEMA_REGISTRY_PASSWORD}"
+
+    if SCHEMA_REGISTRY_CA_LOCATION:
+        config["ssl.ca.location"] = SCHEMA_REGISTRY_CA_LOCATION
+
+    return config
+
 MIN_MESSAGE_BYTES = 10 * 1024
 MESSAGES_PER_TOPIC = 200
 HIGH_VOLUME_TOPIC = "telemetry-events"
@@ -108,7 +170,7 @@ def pad_to_min_size(payload: dict, min_bytes: int = MIN_MESSAGE_BYTES) -> dict:
 
 
 def connect_admin(retries: int = 20, delay: float = 3.0) -> AdminClient:
-    admin = AdminClient({"bootstrap.servers": BOOTSTRAP_SERVERS})
+    admin = AdminClient(kafka_config())
     for attempt in range(1, retries + 1):
         try:
             cluster_metadata = admin.list_topics(timeout=5)
@@ -355,9 +417,9 @@ def seed_avro_sensor_readings(count: int) -> None:
     already serialized for a specific topic/field context, and mixing the two makes it
     unclear which topics are registry-backed.
     """
-    registry = SchemaRegistryClient({"url": SCHEMA_REGISTRY_URL})
+    registry = SchemaRegistryClient(schema_registry_config())
     serializer = AvroSerializer(registry, AVRO_SCHEMA)
-    producer = Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
+    producer = Producer(kafka_config())
 
     sites = ["lisbon-dc1", "dublin-dc2", "singapore-dc3"]
     firmwares = [None, "v2.1.4", "v2.2.0"]
@@ -391,11 +453,10 @@ def main() -> None:
     admin = connect_admin()
     create_topics(admin)
 
-    producer = Producer({
-        "bootstrap.servers": BOOTSTRAP_SERVERS,
+    producer = Producer(kafka_config(**{
         "client.id": "streamlens-seed-producer",
         "queue.buffering.max.messages": 200000,
-    })
+    }))
 
     # order-created/payment-processed/order-shipped share an orderId, one triplet per
     # iteration. So MESSAGES_PER_TOPIC orders gives that many messages in the first two

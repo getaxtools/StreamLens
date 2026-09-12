@@ -19,6 +19,10 @@ cd docker
 docker compose up -d
 ```
 
+For a step-by-step walkthrough of the StreamLens connection dialog itself - which
+fields to fill for each connection type - see
+[`docs/testing-connections.md`](../docs/testing-connections.md).
+
 Wait for `seed` to finish (`docker compose logs -f seed`) - it exits `0` once
 topics are created and sample data is produced. Then point StreamLens at:
 
@@ -74,6 +78,85 @@ fresh batch of sample messages without restarting the whole stack:
 ```bash
 docker compose up seed --build --force-recreate
 ```
+
+## TLS / mTLS stack (optional)
+
+`docker-compose.tls.yml` starts a **second, independent** cluster for exercising the
+TLS, mutual-TLS, and Schema Registry authentication paths. It does not touch the
+plaintext stack above - different containers, different ports, its own volumes -
+so both can run at the same time.
+
+```bash
+cd docker
+docker compose -f docker-compose.tls.yml up -d
+```
+
+First start takes a couple of minutes: a one-shot `certs` container generates a
+throwaway CA and certificates, then the broker, Schema Registry, and seeder come
+up in order.
+
+| Service | Purpose | Port |
+|---|---|---|
+| `kafka-tls` | Broker with an SSL and a SASL_SSL listener | `localhost:9093` (SSL), `localhost:9094` (SASL_SSL) |
+| `schema-registry-tls` | Schema Registry over HTTPS with basic auth | `localhost:8082` |
+| `certs` | One-shot; generates the CA and certificates, then exits | n/a |
+| `scram-init` | One-shot; creates the SCRAM user, then exits | n/a |
+| `seed-tls` | One-shot; seeds the same topics as the plaintext stack | n/a |
+
+### Getting the certificates onto your machine
+
+The certificates live in a Docker volume. Copy them somewhere StreamLens can read:
+
+```bash
+mkdir -p "$HOME/streamlens-certs"
+docker run --rm -v streamlens-tls_certs:/certs -v "$HOME/streamlens-certs:/out"   alpine sh -c "cp /certs/ca.pem /certs/client.pem /certs/client.key /out/"
+```
+
+### Connecting
+
+**Mutual TLS** (port 9093 - the broker requires a client certificate):
+
+- **Bootstrap servers:** `localhost:9093`
+- **Security protocol:** `Ssl`
+- **CA Certificate Path:** `<your path>/ca.pem`
+- **Client Certificate Path:** `<your path>/client.pem`
+- **Client Key Path:** `<your path>/client.key`
+
+**SASL_SSL with SCRAM** (port 9094 - encrypted transport, password login):
+
+- **Bootstrap servers:** `localhost:9094`
+- **Security protocol:** `SaslSsl`
+- **SASL Mechanism:** `ScramSha512`
+- **SASL Username / Password:** `streamlens` / `streamlens-secret`
+- **CA Certificate Path:** `<your path>/ca.pem`
+
+**Schema Registry** (either of the above):
+
+- **Schema Registry URL:** `https://localhost:8082`
+- **Username / Password:** `registry` / `registry-secret`
+
+The CA path is required in every case: these certificates are signed by a private
+CA that nothing in the Windows trust store knows about. That is the point - it is
+the case a public-CA cluster never exercises. If you would rather not point at the
+CA file, **Skip certificate verification** works too, though it defeats the purpose.
+
+Tear down (`-v` also discards the generated certificates, so the next start issues
+new ones and any saved connection profile needs its paths refreshed):
+
+```bash
+docker compose -f docker-compose.tls.yml down -v
+```
+
+### Notes on this stack
+
+- Every credential here is a throwaway for local testing. Nothing in `docker/tls/`
+  is a secret worth protecting, and none of it should be reused anywhere real.
+- The TLS listeners advertise `localhost`, since the client that matters is
+  StreamLens running on the host. In-network containers (the seeder) therefore use
+  the broker's plaintext internal listener instead.
+- The broker sets `ssl.client.auth=required` on port 9093, so a client with no
+  certificate is rejected. That is deliberate - it is what makes the mTLS path
+  testable rather than merely configurable.
 
 ## Notes
 

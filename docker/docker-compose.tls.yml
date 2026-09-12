@@ -1,0 +1,183 @@
+# TLS/mTLS dev stack - a second, independent set of services for exercising the app's
+# TLS, mutual-TLS and Schema Registry basic-auth paths.
+#
+# This does NOT replace or modify docker-compose.yml. That plaintext stack stays exactly as it
+# was and can run at the same time as this one: different project name, different container
+# names, different host ports, its own volume.
+#
+#   docker compose -f docker-compose.tls.yml up -d
+#
+# Ports: 9093 SSL (certificate auth), 9094 SASL_SSL (SCRAM), 8082 Schema Registry (HTTPS+basic).
+name: streamlens-tls
+
+services:
+  # One-shot: builds the throwaway CA, broker keystore, and client certificate into the shared
+  # volume, then exits. Every other service waits for it to complete.
+  certs:
+    image: eclipse-temurin:21-jdk
+    container_name: streamlens-tls-certs
+    volumes:
+      - ./tls:/scripts:ro
+      - certs:/certs
+    entrypoint: ["bash", "/scripts/generate-certs.sh"]
+    restart: "no"
+
+  kafka-tls:
+    image: apache/kafka:3.9.0
+    container_name: streamlens-kafka-tls
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+    ports:
+      # 9093 = SSL with client-certificate auth; 9094 = SASL_SSL with SCRAM-SHA-512.
+      - "9093:9093"
+      - "9094:9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # INTERNAL stays plaintext inside the container network - the controller quorum and the
+      # broker's own traffic are not what's under test here, and keeping them simple avoids
+      # the broker needing to trust its own certificate to talk to itself.
+      # SSL/SASL_SSL advertise "localhost" because the client that matters is StreamLens running
+      # on the host. In-network clients (the seeder) therefore can't use those listeners - they
+      # go through INTERNAL instead, which is why the seeder is configured for plaintext even
+      # though this is the TLS stack. The broker certificate covers both names, so the host-side
+      # TLS handshake still verifies.
+      KAFKA_LISTENERS: INTERNAL://kafka-tls:19092,SSL://0.0.0.0:9093,SASL_SSL://0.0.0.0:9094,CONTROLLER://kafka-tls:19093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-tls:19092,SSL://localhost:9093,SASL_SSL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,SSL:SSL,SASL_SSL:SASL_SSL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-tls:19093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: keystore-credentials.txt
+      KAFKA_SSL_KEY_CREDENTIALS: keystore-credentials.txt
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: keystore-credentials.txt
+      # "required" on the SSL listener is the point of the mTLS test - a client with no
+      # certificate is rejected at the handshake.
+      KAFKA_SSL_CLIENT_AUTH: required
+      # "none" = don't require the certificate's hostname to match the connecting peer, which
+      # would otherwise fail for the client certificate (CN=streamlens-client). The image's
+      # configure script treats an empty string as unset and errors, so this is spelled out.
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: "none"
+
+      KAFKA_SASL_ENABLED_MECHANISMS: SCRAM-SHA-512
+      # Kafka won't start a SASL listener without a KafkaServer JAAS entry naming the login
+      # module, even though the actual SCRAM users live in cluster metadata (see scram-init).
+      # This is also what the image's configure script checks KAFKA_OPTS for.
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/jaas/kafka-jaas.conf"
+
+      # Certificate CN and SASL user both map to principals; both are superusers here so the
+      # dev stack doesn't also require ACL setup to be useful.
+      KAFKA_SUPER_USERS: "User:streamlens-client;User:streamlens;User:ANONYMOUS"
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      CLUSTER_ID: "streamlens-tls-cluster-1"
+    volumes:
+      - certs:/etc/kafka/secrets
+      - ./tls/kafka-jaas.conf:/etc/kafka/jaas/kafka-jaas.conf:ro
+      - kafka-tls-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka-tls:19092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # Creates the SCRAM credentials the SASL_SSL listener authenticates against. Has to run after
+  # the broker is up, since SCRAM users live in the cluster's own metadata.
+  scram-init:
+    image: apache/kafka:3.9.0
+    container_name: streamlens-tls-scram-init
+    depends_on:
+      kafka-tls:
+        condition: service_healthy
+    entrypoint:
+      - bash
+      - -c
+      - |
+        /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka-tls:19092 \
+          --alter --add-config 'SCRAM-SHA-512=[password=streamlens-secret]' \
+          --entity-type users --entity-name streamlens
+        echo "SCRAM user 'streamlens' ready (password: streamlens-secret)"
+    restart: "no"
+
+  # HTTPS + HTTP basic auth, which is the shape Confluent Cloud's registry has and the case the
+  # app previously had no way to authenticate against.
+  schema-registry-tls:
+    image: confluentinc/cp-schema-registry:7.7.1
+    container_name: streamlens-schema-registry-tls
+    depends_on:
+      kafka-tls:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-tls
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-tls:19092
+      SCHEMA_REGISTRY_LISTENERS: https://0.0.0.0:8082
+      # Only an https listener exists, but the registry still defaults its inter-instance
+      # protocol to http and refuses to start when no listener matches that scheme.
+      SCHEMA_REGISTRY_INTER_INSTANCE_PROTOCOL: https
+      SCHEMA_REGISTRY_SSL_KEYSTORE_LOCATION: /etc/schema-registry/secrets/kafka.keystore.jks
+      SCHEMA_REGISTRY_SSL_KEYSTORE_PASSWORD: streamlens
+      SCHEMA_REGISTRY_SSL_KEY_PASSWORD: streamlens
+      SCHEMA_REGISTRY_SSL_TRUSTSTORE_LOCATION: /etc/schema-registry/secrets/kafka.truststore.jks
+      SCHEMA_REGISTRY_SSL_TRUSTSTORE_PASSWORD: streamlens
+      # The registry authenticates its HTTP callers against this JAAS file - unrelated to the
+      # broker's SASL, which is the distinction the app now models with separate credentials.
+      SCHEMA_REGISTRY_AUTHENTICATION_METHOD: BASIC
+      SCHEMA_REGISTRY_AUTHENTICATION_REALM: SchemaRegistry
+      SCHEMA_REGISTRY_AUTHENTICATION_ROLES: admin
+      SCHEMA_REGISTRY_OPTS: "-Djava.security.auth.login.config=/etc/schema-registry/secrets/registry-jaas.conf"
+    volumes:
+      - certs:/etc/schema-registry/secrets
+      - ./tls/registry-jaas.conf:/etc/schema-registry/secrets/registry-jaas.conf:ro
+      - ./tls/registry-users.properties:/etc/schema-registry/secrets/registry-users.properties:ro
+    # The registry takes ~30s to accept requests after the container starts, so the seeder needs
+    # a real readiness signal rather than "container started" - otherwise Avro seeding races it
+    # and is skipped. -k because the registry's certificate is signed by the throwaway CA.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -k -u registry:registry-secret https://localhost:8082/subjects > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # Same seed script as the plaintext stack, pointed at the TLS listener with client
+  # certificates - so the TLS cluster comes up with the same topics to browse.
+  seed-tls:
+    build:
+      context: .
+      dockerfile: seed/Dockerfile
+    container_name: streamlens-tls-seed
+    depends_on:
+      kafka-tls:
+        condition: service_healthy
+      scram-init:
+        condition: service_completed_successfully
+      schema-registry-tls:
+        condition: service_healthy
+    environment:
+      # Plaintext INTERNAL listener - see the note on KAFKA_ADVERTISED_LISTENERS above. The TLS
+      # listeners are advertised as "localhost" for the host app, so they aren't reachable from
+      # inside the compose network. Seeding is just data setup; the TLS paths under test are the
+      # ones StreamLens itself uses from the host.
+      BOOTSTRAP_SERVERS: kafka-tls:19092
+      # The registry is HTTPS with basic auth here; the seeder's Avro topic needs both.
+      SCHEMA_REGISTRY_URL: https://schema-registry-tls:8082
+      SCHEMA_REGISTRY_USERNAME: registry
+      SCHEMA_REGISTRY_PASSWORD: registry-secret
+      SCHEMA_REGISTRY_CA_LOCATION: /certs/ca.pem
+    volumes:
+      - certs:/certs:ro
+    restart: "no"
+
+volumes:
+  certs:
+  kafka-tls-data:

@@ -13,8 +13,8 @@ browser tab. Free to use, including commercially.
 
 ## Download
 
-**[Download StreamLens.exe](https://github.com/getaxtools/StreamLens/releases/download/v0.1.0/StreamLens.exe)**
-— Windows, 75 MB, single self-contained file. Or browse all builds on the
+**[Download StreamLens.exe](https://github.com/getaxtools/StreamLens/releases/latest)**
+— Windows, 54 MB, single self-contained file. Or browse all builds on the
 [Releases page](https://github.com/getaxtools/StreamLens/releases).
 
 No installer, no account, no configuration — download, run, and add your
@@ -67,6 +67,7 @@ Three things it does that free alternatives generally don't:
 | **Masking** | Pattern / field-path redaction rules, applied everywhere the value is shown or exported |
 | **Export** | CSV, JSON, and a zip of per-message JSON files, with spreadsheet formula-injection escaping |
 | **Brokers & groups** | Broker list; consumer groups with state, members, and per-partition committed offsets |
+| **Updates** | Tells you when a new version is out, and links straight to the download. Checks once a day, sends nothing about you, and stays silent when offline |
 
 ## Current limitations
 
@@ -87,11 +88,17 @@ Being upfront so you don't waste a download:
 
 Everything is local. No account, no cloud service, no telemetry.
 
+The one exception is the update check: once a day StreamLens asks GitHub what
+the latest released version is. It sends nothing about you, your machine, or
+your clusters, and it does nothing at all when you're offline. See
+[Keeping StreamLens up to date](docs/usage_guide.md#9-keeping-streamlens-up-to-date).
+
 ```
 %LocalAppData%\StreamLensStudio\
   streamlens.db     # connections, settings, per-topic preferences, audit log
   secrets\          # your cluster passwords, encrypted by Windows
   diagnostic.log    # local troubleshooting log
+  update-check.json # when updates were last checked for, and any version you dismissed
 ```
 
 Kafka messages are **never** written to disk. They stream from the broker and
@@ -112,6 +119,8 @@ attaching it to a bug report.
   SHA-256 hash, and what the code signature does and doesn't prove
 - [Local Kafka sandbox](docker/README.md) — a disposable single-node cluster
   with seeded topics, for trying the app out
+- [Testing connection types](docs/testing-connections.md) — step-by-step setup
+  for plaintext, mutual TLS, SASL/SCRAM, and an authenticated Schema Registry
 
 ## Bugs and feature requests
 
