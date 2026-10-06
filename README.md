@@ -14,7 +14,7 @@ commercially.
 
 ## Download
 
-**[Download StreamLens.exe](https://github.com/getaxtools/StreamLens/releases/download/0.7.0/StreamLens.exe)**
+**[Download StreamLens.exe](https://github.com/getaxtools/StreamLens/releases/download/v0.7.0/StreamLens.exe)**
 for Windows. It's a single self-contained file, about 75 MB. You can also
 browse all the builds on the
 [Releases page](https://github.com/getaxtools/StreamLens/releases).
