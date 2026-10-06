@@ -6,7 +6,7 @@ does and doesn't tell you, and how to check a download.
 ## Read this first: the signature does not prove authenticity
 
 The certificate below signs itself. It is not issued by a certificate authority, so nothing
-about it has been verified by a third party — anyone can generate a certificate claiming any
+about it has been verified by a third party. Anyone can generate a certificate claiming any
 name, including this one.
 
 Concretely, that means:
@@ -30,8 +30,8 @@ Do **not** add this certificate to your Trusted Root Certification Authorities s
 
 Doing so would make your machine trust every program its private key ever signs, indefinitely.
 That key lives in a single developer's Windows certificate store. Installing it buys you
-nothing — the download is verified by its hash, not by this certificate — while permanently
-weakening your machine's trust settings.
+nothing, since the download is verified by its hash rather than by this certificate, while
+permanently weakening your machine's trust settings.
 
 Treat any project that asks you to install its root certificate with suspicion. Including
 this one.
@@ -61,7 +61,7 @@ Get-FileHash .\StreamLens.exe -Algorithm SHA256
 
 If the hash matches, the download is intact and unmodified. If it doesn't, delete the file
 and download it again from the
-[Releases page](https://github.com/getaxtools/StreamLens/releases) — do not run it.
+[Releases page](https://github.com/getaxtools/StreamLens/releases), and do not run it.
 
 ## Inspecting the signature (optional)
 
@@ -73,7 +73,7 @@ Get-AuthenticodeSignature .\StreamLens.exe | Format-List
 
 Expect `Status: UnknownError` and a signer of `CN=StreamLens, O=StreamLens Dev`, for the
 reasons described above. The timestamp is issued by a real timestamp authority (DigiCert), so
-`TimeStamperCertificate` will show a genuine CA-issued certificate — that confirms *when* the
+`TimeStamperCertificate` will show a genuine CA-issued certificate. That confirms *when* the
 file was signed, not *who* signed it.
 
 ## Questions

@@ -8,6 +8,9 @@ start, which ports they expose, and what data gets seeded, see
 
 See also the [usage guide](usage_guide.md) for using the app once connected.
 
+For Schema Registry and Avro decoding specifically, see
+[testing Avro](testing-avro.md).
+
 ## Prerequisites
 
 Both stacks can run at the same time - different project names, containers, ports

@@ -2,12 +2,12 @@
 Seeds the dev Kafka cluster with topics and sample messages so the app has
 something realistic to browse on first connect.
 
-The topics follow the running example from docs/streamlens-studio-spec.md
-(order-created / payment-processed / order-shipped / orders.dlq), which gives
-the correlated multi-topic view, header search and JSON pretty-print something
-to show. The rest add variety - inventory, support tickets, catalog, audit log
-- and telemetry-events is the high-volume/large-payload one for grid
-virtualization and large-message rendering (spec Section 3.2 / Section 5).
+The core topics model one order flow (order-created / payment-processed /
+order-shipped / orders.dlq), which gives the correlated multi-topic view,
+header search and JSON pretty-print something to show. The rest add variety -
+inventory, support tickets, catalog, audit log - and telemetry-events is the
+high-volume/large-payload one for grid virtualization and large-message
+rendering.
 
 Payloads are padded with a "_padding" field up to MIN_MESSAGE_BYTES so even
 the naturally small topics exercise large-message handling.
@@ -119,6 +119,68 @@ AVRO_SCHEMA = """
 }
 """
 
+# The round-trip topic. sensor-readings-avro covers everyday decoding; this one carries every
+# shape where the decoded JSON loses information the schema still has, so the same JSON could
+# not be turned back into the original Avro bytes without consulting the schema. It is decode
+# coverage today, and the fixture for re-encoding Avro once publishing supports it. Each field
+# is here for a specific reason:
+#
+#   recordedAt  timestamp-millis, which renders as an ISO timestamp rather than a raw long.
+#               Converting it back must preserve UTC or every value shifts by the local offset.
+#   status      an enum, which renders as a bare symbol.
+#   checksum    fixed(8), and payload bytes - both render as hex, not base64 and not text.
+#   note        the easy ["null","string"] union: the branches take different JSON kinds.
+#   retries     ["null","int"] and score ["null","float"] - both are bare JSON numbers, so only
+#               the schema says which numeric type each one is.
+#   labels      a map, which renders "{}" exactly like an empty record does. Telling them apart
+#               needs the schema, not the JSON shape.
+#   location    a nested record with its own nullable union, for recursion.
+#   samples     array<double>, for exact formatting of doubles.
+DEVICE_TELEMETRY_TOPIC = "device-telemetry-avro"
+
+DEVICE_TELEMETRY_SCHEMA = """
+{
+  "type": "record",
+  "name": "DeviceTelemetry",
+  "namespace": "com.streamlens.demo",
+  "fields": [
+    { "name": "deviceId", "type": "string" },
+    { "name": "recordedAt", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    {
+      "name": "status",
+      "type": {
+        "type": "enum",
+        "name": "DeviceStatus",
+        "symbols": ["ONLINE", "DEGRADED", "OFFLINE", "UNKNOWN"]
+      }
+    },
+    { "name": "checksum", "type": { "type": "fixed", "name": "Checksum", "size": 8 } },
+    { "name": "payload", "type": "bytes" },
+    { "name": "note", "type": ["null", "string"], "default": null },
+    { "name": "retries", "type": ["null", "int"], "default": null },
+    { "name": "score", "type": ["null", "float"], "default": null },
+    { "name": "labels", "type": { "type": "map", "values": "string" } },
+    {
+      "name": "location",
+      "type": {
+        "type": "record",
+        "name": "Location",
+        "fields": [
+          { "name": "site", "type": "string" },
+          { "name": "rack", "type": ["null", "string"], "default": null }
+        ]
+      }
+    },
+    { "name": "samples", "type": { "type": "array", "items": "double" } }
+  ]
+}
+"""
+
+# Confluent's ProtobufSerializer needs the generated module, compiled into the image by the
+# Dockerfile. Imported lazily in the seeder so a protobuf dependency problem can't stop the Avro
+# and JSON topics from seeding.
+PROTOBUF_TOPIC = "shipment-events-proto"
+
 TOPIC_SPECS = [
     ("order-created", 3),
     ("payment-processed", 3),
@@ -131,6 +193,8 @@ TOPIC_SPECS = [
     ("audit-log", 1),
     (HIGH_VOLUME_TOPIC, 3),
     (AVRO_TOPIC, 2),
+    (DEVICE_TELEMETRY_TOPIC, 3),
+    (PROTOBUF_TOPIC, 2),
 ]
 
 CUSTOMERS = [
@@ -391,7 +455,7 @@ def seed_audit_log(producer: Producer, count: int) -> None:
 
 def seed_telemetry_events(producer: Producer, count: int) -> None:
     """High-volume, large-payload topic for grid scrolling and large-message
-    rendering (spec Section 3.2 / Section 5)."""
+    rendering."""
     metrics = ["cpu_percent", "memory_percent", "disk_io_ops", "network_latency_ms", "queue_depth"]
     for i in range(count):
         device_id = f"device-{i % 50:03d}"
@@ -449,6 +513,128 @@ def seed_avro_sensor_readings(count: int) -> None:
     print(f"[seed] seeded {AVRO_TOPIC} ({count} Avro msgs via Schema Registry)")
 
 
+def seed_device_telemetry(count: int) -> None:
+    """Produces the round-trip Avro topic (see DEVICE_TELEMETRY_SCHEMA for why each field exists).
+
+    Values are deliberately varied so the encoder can't pass by handling one shape: the three
+    nullable fields are independently null or present, and there is at least one empty map and
+    one empty array - an empty map renders "{}" exactly like an empty record would.
+    """
+    registry = SchemaRegistryClient(schema_registry_config())
+    serializer = AvroSerializer(registry, DEVICE_TELEMETRY_SCHEMA)
+    producer = Producer(kafka_config())
+
+    sites = ["lisbon-dc1", "dublin-dc2", "singapore-dc3"]
+    statuses = ["ONLINE", "DEGRADED", "OFFLINE", "UNKNOWN"]
+    notes = [None, "scheduled maintenance", "replaced fan tray", None, "firmware rollback"]
+
+    for i in range(count):
+        device_id = f"device_{i % 40:04d}"
+
+        # fixed(8) needs exactly 8 raw bytes, and bytes needs raw bytes - not str, and not hex
+        # text. The viewer renders both as hex; producing hex text here would seed a string that
+        # only looks right.
+        checksum = (i * 2654435761 % (1 << 64)).to_bytes(8, "big")
+        payload = bytes((i + offset) % 256 for offset in range(12))
+
+        record = {
+            "deviceId": device_id,
+            # Timezone-aware datetime, not an int: AvroSerializer does the epoch conversion for
+            # timestamp-millis, and passing an int would double-convert.
+            "recordedAt": datetime.now(timezone.utc) + timedelta(seconds=i),
+            "status": statuses[i % len(statuses)],
+            "checksum": checksum,
+            "payload": payload,
+            "note": notes[i % len(notes)],
+            "retries": None if i % 3 == 0 else i % 7,
+            "score": None if i % 4 == 0 else round(0.5 + (i % 50) / 100.0, 3),
+            # Every third message carries an empty map.
+            "labels": {} if i % 3 == 0 else {
+                "env": "prod" if i % 2 == 0 else "staging",
+                "tier": f"t{i % 4}",
+            },
+            "location": {
+                "site": sites[i % len(sites)],
+                "rack": None if i % 5 == 0 else f"rack-{chr(ord('a') + i % 6)}",
+            },
+            # Every seventh message carries an empty array.
+            "samples": [] if i % 7 == 0 else [round((i + s) * 1.5, 4) for s in range(5)],
+        }
+
+        producer.produce(
+            topic=DEVICE_TELEMETRY_TOPIC,
+            key=device_id.encode("utf-8"),
+            value=serializer(record, SerializationContext(DEVICE_TELEMETRY_TOPIC, MessageField.VALUE)),
+        )
+
+    remaining = producer.flush(60)
+    if remaining > 0:
+        print(f"[seed] WARNING: {remaining} device-telemetry messages undelivered")
+        sys.exit(1)
+    print(f"[seed] seeded {DEVICE_TELEMETRY_TOPIC} ({count} Avro msgs, round-trip cases)")
+
+
+def seed_shipment_events(count: int) -> None:
+    """Produces the Protobuf topic through Schema Registry.
+
+    Imports are local to this function: the generated module and the protobuf serializer are the
+    only dependencies in this script that need protoc to have run, so an image built without them
+    degrades to "Protobuf seeding skipped" instead of failing the whole run at import time.
+    """
+    from confluent_kafka.schema_registry.protobuf import ProtobufSerializer
+
+    import shipment_events_pb2 as pb
+
+    registry = SchemaRegistryClient(schema_registry_config())
+    serializer = ProtobufSerializer(
+        pb.ShipmentEvent,
+        registry,
+        {"use.deprecated.format": False},
+    )
+    producer = Producer(kafka_config())
+
+    carriers = ["UPS", "FedEx", "DHL", "Royal Mail"]
+    statuses = [
+        pb.ShipmentEvent.IN_TRANSIT,
+        pb.ShipmentEvent.OUT_FOR_DELIVERY,
+        pb.ShipmentEvent.DELIVERED,
+        pb.ShipmentEvent.EXCEPTION,
+        pb.ShipmentEvent.STATUS_UNSPECIFIED,
+    ]
+
+    for i in range(count):
+        shipment_id = f"shp_{7000 + i}"
+        event = pb.ShipmentEvent(
+            shipment_id=shipment_id,
+            carrier=carriers[i % len(carriers)],
+            status=statuses[i % len(statuses)],
+            # A realistic epoch-millis value, which checks that int64 renders as a plain number.
+            last_seen_millis=1757000000000 + i * 1000,
+            signature=bytes((i + offset) % 256 for offset in range(6)),
+            origin=pb.GeoPoint(latitude=38.7223, longitude=-9.1393, label="Lisbon"),
+            destination=pb.GeoPoint(latitude=53.3498, longitude=-6.2603, label="Dublin"),
+            waypoints=[f"hub-{(i + n) % 5}" for n in range(i % 4)],
+            labels={} if i % 3 == 0 else {"priority": "high" if i % 2 else "normal"},
+        )
+
+        # Left unset on some messages so the topic carries both states. An unset optional field
+        # is absent from the wire entirely, unlike one explicitly set to 0.
+        if i % 4 != 0:
+            event.delay_minutes = i % 90
+
+        producer.produce(
+            topic=PROTOBUF_TOPIC,
+            key=shipment_id.encode("utf-8"),
+            value=serializer(event, SerializationContext(PROTOBUF_TOPIC, MessageField.VALUE)),
+        )
+
+    remaining = producer.flush(60)
+    if remaining > 0:
+        print(f"[seed] WARNING: {remaining} Protobuf messages undelivered")
+        sys.exit(1)
+    print(f"[seed] seeded {PROTOBUF_TOPIC} ({count} Protobuf msgs via Schema Registry)")
+
+
 def main() -> None:
     admin = connect_admin()
     create_topics(admin)
@@ -477,21 +663,33 @@ def main() -> None:
         print(f"[seed] WARNING: {remaining} messages were not delivered before flush timeout")
         sys.exit(1)
 
-    # After the JSON flush. Avro has its own producer and serializer (see that function's
-    # docstring). A registry that can't be reached shouldn't undo the JSON topics already
-    # seeded, so report it and carry on instead of failing the run.
-    try:
-        seed_avro_sensor_readings(MESSAGES_PER_TOPIC)
-    except Exception as exc:  # noqa: BLE001 - seeding is best-effort for the Avro slice
-        print(f"[seed] WARNING: Avro seeding skipped ({exc})")
+    # After the JSON flush. Each registry-backed topic has its own producer and serializer (see
+    # those functions' docstrings) and its own try block: a registry that can't be reached, or a
+    # protobuf runtime that didn't get compiled into the image, shouldn't undo the topics already
+    # seeded or take down the other registry-backed ones.
+    skipped = []
+    for label, seeder in (
+        (AVRO_TOPIC, seed_avro_sensor_readings),
+        (DEVICE_TELEMETRY_TOPIC, seed_device_telemetry),
+        (PROTOBUF_TOPIC, seed_shipment_events),
+    ):
+        try:
+            seeder(MESSAGES_PER_TOPIC)
+        except Exception as exc:  # noqa: BLE001 - registry-backed seeding is best-effort
+            print(f"[seed] WARNING: {label} seeding skipped ({exc})")
+            skipped.append(label)
 
     print(
         "[seed] done: seeded order-created, payment-processed, order-shipped, orders.dlq, "
         "user-events, inventory-updates, customer-support-tickets, product-catalog, "
-        f"audit-log ({MESSAGES_PER_TOPIC} msgs each), {HIGH_VOLUME_TOPIC} "
-        f"({HIGH_VOLUME_MESSAGE_COUNT} msgs), and {AVRO_TOPIC} (Avro via Schema Registry); "
-        f"every JSON message >= {MIN_MESSAGE_BYTES} bytes"
+        f"audit-log ({MESSAGES_PER_TOPIC} msgs each) and {HIGH_VOLUME_TOPIC} "
+        f"({HIGH_VOLUME_MESSAGE_COUNT} msgs); every JSON message >= {MIN_MESSAGE_BYTES} bytes"
     )
+    seeded = [t for t in (AVRO_TOPIC, DEVICE_TELEMETRY_TOPIC, PROTOBUF_TOPIC) if t not in skipped]
+    if seeded:
+        print(f"[seed] registry-backed topics seeded: {', '.join(seeded)}")
+    if skipped:
+        print(f"[seed] registry-backed topics SKIPPED: {', '.join(skipped)} (see warnings above)")
 
 
 if __name__ == "__main__":

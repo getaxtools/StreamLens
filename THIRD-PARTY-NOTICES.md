@@ -9,7 +9,7 @@ This file covers the components distributed in the StreamLens Studio binary
 (`StreamLens.exe`, a self-contained `win-x64` single-file build). Build-time and
 test-only dependencies are not distributed and are not listed.
 
-Last reviewed: 2026-09-08, against StreamLens Studio v0.1.0.
+Last reviewed: 2026-10-06, against StreamLens Studio v0.6.0.
 
 ---
 
@@ -38,6 +38,7 @@ Last reviewed: 2026-09-08, against StreamLens Studio v0.1.0.
 | Confluent.SchemaRegistry | 2.15.0 | Apache-2.0 |
 | Confluent.SchemaRegistry.Serdes.Avro | 2.15.0 | Apache-2.0 |
 | Dapper | 2.1.79 | Apache-2.0 |
+| Google.Protobuf | 3.36.1 | BSD-3-Clause |
 | HarfBuzzSharp | 8.3.1.3 | MIT |
 | HarfBuzzSharp.NativeAssets.Linux | 8.3.1.3 | MIT |
 | HarfBuzzSharp.NativeAssets.macOS | 8.3.1.3 | MIT |
@@ -57,6 +58,8 @@ Last reviewed: 2026-09-08, against StreamLens Studio v0.1.0.
 | Newtonsoft.Json | 13.0.1 | MIT |
 | Polly | 8.7.0 | BSD-3-Clause |
 | Polly.Core | 8.7.0 | BSD-3-Clause |
+| protobuf-net.Core | 3.4.21 | Apache-2.0 |
+| protobuf-net.Reflection | 3.4.21 | Apache-2.0 |
 | SkiaSharp | 3.119.4 | MIT |
 | SkiaSharp.NativeAssets.Linux | 3.119.4 | MIT |
 | SkiaSharp.NativeAssets.macOS | 3.119.4 | MIT |
@@ -141,6 +144,8 @@ The following components are licensed under the Apache License, Version 2.0:
   Inc. - https://github.com/confluentinc/confluent-kafka-dotnet/
 - **Dapper** (2.1.79) - Copyright 2019 Stack Exchange, Inc. -
   https://github.com/DapperLib/Dapper
+- **protobuf-net.Core**, **protobuf-net.Reflection** (3.4.21) - Copyright (c)
+  Marc Gravell - https://github.com/protobuf-net/protobuf-net
 - **SQLitePCLRaw.bundle_e_sqlite3**, **SQLitePCLRaw.core**,
   **SQLitePCLRaw.lib.e_sqlite3**, **SQLitePCLRaw.provider.e_sqlite3** (2.1.12) -
   Copyright 2014-2024 SourceGear, LLC
@@ -176,6 +181,8 @@ The following components are licensed under the BSD 3-Clause License:
 
 - **Polly**, **Polly.Core** (8.7.0) - Copyright (c) 2015-2026, App vNext -
   https://github.com/App-vNext/Polly
+- **Google.Protobuf** (3.36.1) - Copyright 2008 Google Inc. -
+  https://github.com/protocolbuffers/protobuf
 
 ```
 Redistribution and use in source and binary forms, with or without

@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package com.streamlens.demo;
+
+// Seeds shipment-events-proto so the Protobuf decoder has real Confluent-produced data to
+// read rather than hand-written wire bytes.
+//
+// IMPORTANT - do not reorder the messages in this file. GeoPoint is declared first so that
+// ShipmentEvent is the SECOND top-level message, which makes Confluent write a message-index of
+// [1] into each payload. A first message would be written using Confluent's single-0x00-byte
+// shortcut instead, and that shortcut is already covered. This topic is the only place the
+// decoder meets a non-zero message index in bytes it did not produce itself, so moving
+// ShipmentEvent to the top silently removes that coverage.
+message GeoPoint {
+  double latitude = 1;
+  double longitude = 2;
+  string label = 3;
+}
+
+message ShipmentEvent {
+  // Field names stay snake_case on purpose: the viewer renders the original .proto names
+  // rather than lowerCamelCase, and this topic is what shows it.
+  string shipment_id = 1;
+  string carrier = 2;
+
+  Status status = 3;
+
+  // int64 renders as an unquoted JSON number, unlike Google's JsonFormatter, which quotes
+  // 64-bit ints.
+  int64 last_seen_millis = 4;
+
+  // Renders as hex, the same convention the viewer uses for Avro bytes.
+  bytes signature = 5;
+
+  GeoPoint origin = 6;
+  GeoPoint destination = 7;
+
+  repeated string waypoints = 8;
+
+  map<string, string> labels = 9;
+
+  // Explicit presence: an unset optional is absent from the wire, while one set to 0 is
+  // written. The seeder leaves it unset on some messages so the topic carries both states.
+  optional int32 delay_minutes = 10;
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    IN_TRANSIT = 1;
+    OUT_FOR_DELIVERY = 2;
+    DELIVERED = 3;
+    EXCEPTION = 4;
+  }
+}

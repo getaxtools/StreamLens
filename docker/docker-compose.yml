@@ -41,6 +41,16 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:19092
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    # The registry takes several seconds after the container starts before it accepts
+    # connections. Without this, the seeder's "service_started" dependency was satisfied while
+    # the port was still refusing, and every registry-backed topic was skipped with a warning
+    # while the run still exited 0.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/subjects >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   seed:
     build:
@@ -50,11 +60,13 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      # The Avro topic goes through Schema Registry, so don't start seeding before the
-      # registry is up. Seeding still works without it (the JSON topics seed fine), but
-      # waiting keeps the normal run warning-free.
+      # The Avro and Protobuf topics go through Schema Registry, so don't start seeding before
+      # the registry actually answers. service_started only means the container launched, which
+      # let the seeder race ahead and skip every registry-backed topic; service_healthy waits
+      # for the port to respond. Seeding still degrades gracefully without it (the JSON topics
+      # seed fine), but the normal run should be warning-free.
       schema-registry:
-        condition: service_started
+        condition: service_healthy
     environment:
       BOOTSTRAP_SERVERS: kafka:19092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081

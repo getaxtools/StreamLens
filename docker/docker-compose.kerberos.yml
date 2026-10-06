@@ -1,0 +1,153 @@
+# Kerberos/GSSAPI dev stack - a throwaway KDC and a broker that accepts only
+# SASL_PLAINTEXT/GSSAPI, for exercising the app's Kerberos path.
+#
+# Independent of docker-compose.yml and docker-compose.tls.yml: different project name,
+# different container names, different host ports, its own volumes. All three can run at
+# the same time.
+#
+#   docker compose -f docker-compose.kerberos.yml up -d
+#
+# Ports: 9095 broker (SASL_PLAINTEXT/GSSAPI), 8088 KDC (udp+tcp), 8089 kadmin.
+#
+# Read docker/README.md before testing from Windows - the Windows Kafka client uses
+# native SSPI rather than MIT Kerberos, so this standalone realm can't authenticate a
+# Windows login. This stack verifies the broker side and a Linux/WSL client.
+name: streamlens-krb
+
+services:
+  # Builds the realm, principals and keytabs, then runs the KDC in the foreground.
+  # Unlike the TLS stack's one-shot `certs` service this is long-running, because the
+  # KDC has to stay up to issue tickets - so readiness is a healthcheck on the .ready
+  # file the setup script touches once every principal exists.
+  kdc:
+    image: ubuntu:24.04
+    container_name: streamlens-krb-kdc
+    ports:
+      # The KDC is on 88 inside; published high so it doesn't collide with a real one.
+      - "8088:88/udp"
+      - "8088:88/tcp"
+      - "8089:749/tcp"
+    environment:
+      REALM: STREAMLENS.TEST
+      KDC_HOST: kdc
+      BROKER_HOST: kafka-krb
+      DEBIAN_FRONTEND: noninteractive
+    volumes:
+      - ./kerberos:/scripts:ro
+      - keytabs:/keytabs
+    # krb5-kdc isn't in the base image. Installing at run time keeps this stack to a
+    # single file with no build step, matching how the TLS stack's certs service works.
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        apt-get update -qq
+        apt-get install -y -qq krb5-kdc krb5-admin-server krb5-user >/dev/null
+        exec bash /scripts/setup-kdc.sh
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /keytabs/.ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 20s
+    restart: "no"
+
+  kafka-krb:
+    image: apache/kafka:3.9.0
+    container_name: streamlens-kafka-krb
+    depends_on:
+      kdc:
+        condition: service_healthy
+    ports:
+      - "9095:9095"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # INTERNAL stays plaintext inside the container network, same reasoning as the TLS
+      # stack: the controller quorum and the broker's own traffic are not under test, and
+      # a GSSAPI inter-broker listener would need the broker to hold a client ticket too.
+      #
+      # SASL_PLAINTEXT advertises kafka-krb (not localhost) because Kerberos binds the
+      # service ticket to the hostname the client connected to - the service principal is
+      # kafka/kafka-krb@STREAMLENS.TEST. A host client must reach it by that name, which
+      # is why README tells you to add `127.0.0.1 kafka-krb` to your hosts file.
+      KAFKA_LISTENERS: INTERNAL://kafka-krb:19092,SASL_PLAINTEXT://0.0.0.0:9095,CONTROLLER://kafka-krb:19093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-krb:19092,SASL_PLAINTEXT://kafka-krb:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-krb:19093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      KAFKA_SASL_ENABLED_MECHANISMS: GSSAPI
+      # Must match the first component of the service principal. The app's "Kerberos
+      # service name" field has to be set to this same value.
+      KAFKA_SASL_KERBEROS_SERVICE_NAME: kafka
+      # java.security.krb5.conf points the JVM at the realm the KDC built; the JAAS file
+      # names the broker's keytab. Both come from the shared volume.
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/jaas/kafka-jaas.conf -Djava.security.krb5.conf=/etc/kafka/jaas/krb5.conf"
+
+      # The GSSAPI principal authenticates as its short name. ANONYMOUS covers the
+      # plaintext INTERNAL listener the seeder and healthcheck use.
+      KAFKA_SUPER_USERS: "User:streamlens;User:ANONYMOUS"
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      CLUSTER_ID: "streamlens-krb-cluster-1"
+    volumes:
+      # The keytab volume carries kafka-jaas.conf and krb5.conf as well, both written by
+      # setup-kdc.sh so they can't drift from the realm that was actually created.
+      - keytabs:/etc/kafka/jaas:ro
+      - kafka-krb-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka-krb:19092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # Copies client.keytab and krb5.host.conf out to docker/kerberos/out/ for a host-side
+  # client, then exits. Separate from the KDC so a failed copy (read-only mount, missing
+  # directory) is visible as its own failure rather than buried in KDC logs.
+  krb-export:
+    image: ubuntu:24.04
+    container_name: streamlens-krb-export
+    depends_on:
+      kdc:
+        condition: service_healthy
+    volumes:
+      - keytabs:/keytabs:ro
+      - ./kerberos/out:/out
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        cp /keytabs/client.keytab /keytabs/krb5.host.conf /out/
+        chmod 644 /out/client.keytab /out/krb5.host.conf
+        echo "[krb-export] wrote client.keytab and krb5.host.conf to docker/kerberos/out/"
+    restart: "no"
+
+  # Seeds the same topics as the other stacks. Goes through the plaintext INTERNAL
+  # listener rather than GSSAPI - the seeder is not what's under test, and giving it a
+  # Kerberos identity would mean shipping a krb5 client into the seed image.
+  #
+  # No Schema Registry in this stack, so the three registry-backed topics (Avro and
+  # Protobuf) are skipped with a warning. Kerberos is a connection-path test.
+  seed-krb:
+    build:
+      context: .
+      dockerfile: seed/Dockerfile
+    container_name: streamlens-krb-seed
+    depends_on:
+      kafka-krb:
+        condition: service_healthy
+    environment:
+      BOOTSTRAP_SERVERS: kafka-krb:19092
+    restart: "no"
+
+volumes:
+  keytabs:
+  kafka-krb-data:
