@@ -3,8 +3,8 @@
 How to exercise StreamLens's Schema Registry decoding (Avro and Protobuf)
 against the local Docker stack, including the cases that are supposed to fail.
 This is the app-side walkthrough. For what the stacks start and which ports
-they expose, see [`docker/README.md`](../docker/README.md), and for connection
-setup see [testing connections](testing-connections.md).
+they expose, see [`docker/README.md`](../../docker/README.md), and for connection
+setup see [testing connections](connections.md).
 
 Most of it is Avro, which has the wider range of edge cases. Protobuf is
 check 10.
@@ -41,14 +41,14 @@ Seeded by the default run:
 | Topic | Messages | What it exercises |
 |---|---|---|
 | `sensor-readings-avro` | 200 | Happy path: one schema, flat record, optional field, array |
-| `device-telemetry-avro` | 200 | `timestamp-millis`, enum, `fixed`, `bytes`, nullable `int` *and* `float`, map, nested record, array of doubles |
+| `device-telemetry-avro` | 200 | `timestamp-millis`, enum, `fixed`, `bytes`, nullable `int` and `float`, map, nested record, array of doubles |
 | `shipment-events-proto` | 200 | Protobuf: nested messages, enum, map, repeated field (see check 10) |
 
 Seeded by `seed_avro_edge_cases.py`:
 
 | Topic | Messages | Parts | What it exercises |
 |---|---|---|---|
-| `avro-evolution` | 120 | 2 | **Three schema versions in one topic** (40 each). Subject `avro-evolution-value` has versions 1, 2, 3. |
+| `avro-evolution` | 120 | 2 | Three schema versions in one topic (40 each). Subject `avro-evolution-value` has versions 1, 2, 3. |
 | `avro-logical-types` | 80 | 1 | `decimal`, `date`, `timestamp-millis`, `timestamp-micros`, `uuid`, `time-millis` |
 | `avro-complex` | 80 | 2 | Enum, two maps, array of records, union of two record types, `fixed`, nested optional record, a 3-branch union |
 | `avro-unframed` | 20 | 1 | **Must fail.** Plain UTF-8 JSON on an Avro topic, no magic byte |
@@ -62,7 +62,7 @@ Registry subjects: `sensor-readings-avro-value`, `device-telemetry-avro-value`,
 Connect with **Schema Registry URL** `http://localhost:8081` and set the topic
 format to **Avro** (or **Protobuf** for `shipment-events-proto`).
 
-> **Schema ids are global and assigned in seeding order**, so they aren't
+> Schema ids are global and assigned in seeding order, so they aren't
 > stable across rebuilds. Never assume they start at 1. Read them from the
 > registry instead:
 >
@@ -84,8 +84,8 @@ This is the check most likely to go wrong. Open `avro-evolution`. All 120
 messages are in one topic but framed with three different schema ids.
 
 - **Every message decodes.** A reader that resolves the schema per message
-  handles all three. One pinned to "latest" mangles or drops the v1 and v2
-  messages.
+  handles all three. One pinned to the latest version mangles or drops the v1
+  and v2 messages.
 - **v1 messages show two fields** (`customerId`, `email`) and no phantom
   `displayName`/`address` keys.
 - **v2 messages add** `displayName` and `loyaltyTier`, with `displayName` null
@@ -119,12 +119,12 @@ header are the only ground truth for this check.
 Open `avro-logical-types`. These are annotated primitives, so ignoring the
 annotation produces plausible-looking but wrong output:
 
-- `amount` is a **decimal**, not a byte array. Wrong looks like `b'\x01\xe2@'`
-  or a base64 blob.
-- `bookedOn` is a **date**, not an int near 20000.
-- `bookedAt` and `settledAt` are **timestamps**, not 13- or 16-digit longs.
-- `processingTime` is a **time of day**, not an int near 86400000.
-- `entryId` is a **uuid** string.
+- `amount` is a decimal, not a byte array. Wrong output looks like
+  `b'\x01\xe2@'` or a base64 blob.
+- `bookedOn` is a date, not an int near 20000.
+- `bookedAt` and `settledAt` are timestamps, not 13- or 16-digit longs.
+- `processingTime` is a time of day, not an int near 86400000.
+- `entryId` is a uuid string.
 
 Whichever way the app renders logical types, the detail pane and every export
 format should agree.
@@ -139,7 +139,7 @@ truncating or flattening them:
   record with arbitrary keys
 - `steps[].output`, a 3-branch union of `null`/`string`/`bytes`, cycling
   through all three
-- `trigger`, a union of two *record* types. The branch name should be visible,
+- `trigger`, a union of two record types. The branch name should be visible,
   since `{"cron": ...}` and `{"actor": ...}` are different types, not one
   optional record
 - `checksum`, a 16-byte `fixed`, shown as hex rather than garbled text
@@ -147,8 +147,8 @@ truncating or flattening them:
 
 ### 5. Decode failures
 
-These three topics contain messages that **cannot** decode as Avro. That is the
-test. For each one:
+These three topics contain messages that cannot decode as Avro. That is what's
+being tested. For each one:
 
 - **The error is per message, not per topic.** Other messages keep rendering.
 - **The error says which failure it was.** "Not Confluent-framed", "unexpected
@@ -161,7 +161,7 @@ test. For each one:
 | Topic | Expected |
 |---|---|
 | `avro-unframed` | Starts with `0x7b` (`{`), so it's recognizably not Avro. This is what a producer writes when it sends an Avro topic plain text, and it's the most common Avro mistake. |
-| `avro-bad-magic` | Rejected on the magic byte. A decoder that blindly skips 5 bytes would read the valid schema id that follows and produce **garbage that looks like a successful decode**, the worst possible outcome. |
+| `avro-bad-magic` | Rejected on the magic byte. A decoder that blindly skips 5 bytes would read the valid schema id that follows and produce garbage that looks like a successful decode, which is the hardest failure to notice. |
 | `avro-unknown-schema-id` | The registry lookup returns 404. It should fail fast with the id named, not retry or hang. |
 
 On `avro-unknown-schema-id`, watch the registry while the 20 messages decode:
@@ -170,8 +170,8 @@ On `avro-unknown-schema-id`, watch the registry while the 20 messages decode:
 docker compose logs -f schema-registry
 ```
 
-Note how many lookups the app makes for the same missing id. One per message
-means failed lookups aren't cached, which is worth reporting.
+Count how many lookups the app makes for the same missing id. One per message
+means failed lookups aren't cached, and should be reported.
 
 ### 6. Registry connection failures
 
@@ -203,8 +203,8 @@ docker compose -f docker-compose.tls.yml run --rm seed-tls python seed_avro_edge
 ```
 
 Connect with registry URL `https://localhost:8082`, username `registry`,
-password `registry-secret`, and the CA path. Confirm that a **wrong password
-produces a registry auth error** that's distinct from a broker auth error. The
+password `registry-secret`, and the CA path. Confirm that a wrong password
+produces a registry auth error that's distinct from a broker auth error. The
 two services have separate credentials, and mixing them up sends users down the
 wrong path.
 
@@ -214,21 +214,21 @@ Avro decoding is where masking and export are most likely to regress, because
 the value reaching the rule is a decoded object rather than a JSON string.
 
 - Add a field-path rule against an Avro field (e.g. `$.email` on
-  `avro-evolution`) and confirm it redacts in the list, the detail pane, **and**
+  `avro-evolution`) and confirm it redacts in the list, the detail pane, and
   every export format.
 - Export `avro-complex` to CSV and JSON and confirm nested records, maps, and
   `bytes` fields come through intact rather than as language-specific debug
   strings.
-- Confirm a message that **failed** to decode exports as something honest
-  (raw bytes or an explicit error), not as an empty row.
+- Confirm a message that failed to decode exports as raw bytes or an explicit
+  error, not as an empty row.
 
-See [masking and redaction](usageGuide/masking-and-redaction.md).
+See [masking and redaction](../masking-and-redaction.md).
 
 ### 9. Publishing to an Avro or Protobuf topic
 
 StreamLens doesn't encode Avro or Protobuf when it publishes. It sends the
 editor text as plain UTF-8, without the Confluent framing (magic byte and
-schema id). So any message it publishes to a schema-backed topic is unreadable
+schema id). Any message it publishes to a schema-backed topic is unreadable
 to consumers that use the registered schema. The checks below cover the guards
 that exist today, and confirm the known gap is still there until it's fixed.
 
@@ -249,11 +249,12 @@ onto the topic:
 - Switch `avro-evolution` to **String** or **JSON**. **Republish** is enabled
   again, because the guard goes by the format you're viewing rather than by the
   topic's registered schema.
-- A **New** message whose JSON *matches* the schema is published, as plain
+- A **New** message whose JSON matches the schema is published, as plain
   text, whatever format you're viewing.
 
-Verify what actually landed rather than trusting the app's own read-back,
-because a producer and a viewer that share the same bug agree with each other.
+Check what was written to the topic rather than trusting the app's own
+read-back, because a producer and a viewer with the same bug agree with each
+other.
 Start this consumer, publish from the app, then stop it with Ctrl+C:
 
 ```bash
