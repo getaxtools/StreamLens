@@ -1,20 +1,31 @@
-# StreamLens Studio
+# StreamLens Studio: Free Kafka Desktop Client and GUI
 
-A native desktop client for Apache Kafka, for developers and platform engineers
-who want to browse topics, tail and decode messages, and mask sensitive fields
-without deploying a web UI.
+**A native Apache Kafka GUI for Windows.** Browse topics, live-tail and decode
+messages, search a whole topic, and mask sensitive fields without deploying a
+web UI.
 
+[![GitHub stars](https://img.shields.io/github/stars/getaxtools/StreamLens?style=flat&logo=github)](https://github.com/getaxtools/StreamLens/stargazers)
 [![Free for commercial use](https://img.shields.io/badge/license-free%20for%20commercial%20use-green)](#license)
 [![Latest release](https://img.shields.io/github/v/release/getaxtools/StreamLens?include_prereleases&sort=semver)](https://github.com/getaxtools/StreamLens/releases)
 [![Downloads](https://img.shields.io/github/downloads/getaxtools/StreamLens/total)](https://github.com/getaxtools/StreamLens/releases)
-[![Platform: Windows](https://img.shields.io/badge/platform-Windows-blue)](#download)
-[![macOS and Linux: in progress](https://img.shields.io/badge/macOS%20%7C%20Linux-in%20progress-lightgrey)](#download)
+[![Platform: Windows](https://img.shields.io/badge/platform-Windows-blue)](#quickstart)
+[![macOS and Linux: in progress](https://img.shields.io/badge/macOS%20%7C%20Linux-in%20progress-lightgrey)](#macos-and-linux)
 
-![StreamLens live tail with masking](docs/images/hero.gif)
+StreamLens Studio is a free Kafka desktop client that lets you tail, decode,
+search, and export Kafka messages from a single `.exe`, with no server to host
+and no seat license to buy. Avro and Protobuf messages decode through your
+Confluent Schema Registry, and masking rules keep card numbers and other PII
+off your screen and out of every export.
+
+<!-- Demo: keep this GIF under ~10 MB so it autoplays on GitHub. Replace
+     docs/images/hero.gif to update it. -->
+![StreamLens Kafka desktop client: live tail of a payments topic with card numbers masked](docs/images/hero.gif)
 
 *Live tail of a `payments` topic. Saving a masking rule on `$.card.number`
 cuts every card number on screen down to its last four digits, in the message
 list and the detail pane.*
+
+▶️ **[Watch the overview video](docs/videos/streamLens-Marketing.mp4)** (MP4, 8.7 MB)
 
 > **Status: v0.8.0, pre-release.** Stable: cluster connections, topic browsing
 > and live tail, decoding, search, publishing, masking, export, the audit log,
@@ -25,82 +36,201 @@ list and the detail pane.*
 > so stay tuned for updates. There are real gaps, so read
 > [Current limitations](#current-limitations) before you download.
 
+**Contents:** [Quickstart](#quickstart) ·
+[Key features](#key-features) ·
+[How it works](#how-it-works) ·
+[How it compares](#how-it-compares) ·
+[Current limitations](#current-limitations) ·
+[Roadmap](#roadmap) ·
+[Where your data lives](#where-your-data-lives) ·
+[Documentation](#documentation)
+
 ---
 
-## Download
+## Quickstart
 
-**Windows:** [Download StreamLens.exe](https://github.com/getaxtools/StreamLens/releases/download/v0.8.0/StreamLens.exe).
-It's a single self-contained file, about 75 MB. No installer, no account,
-nothing to configure. Download it, run it, and add your first cluster
-connection.
+### Windows
+
+[**Download StreamLens.exe**](https://github.com/getaxtools/StreamLens/releases/latest/download/StreamLens.exe).
+It's a single self-contained file, about 75 MB. No installer, no .NET
+runtime, no account, nothing to configure.
+
+Or from PowerShell:
+
+```powershell
+# Download the latest release
+Invoke-WebRequest -Uri https://github.com/getaxtools/StreamLens/releases/latest/download/StreamLens.exe -OutFile StreamLens.exe
+
+# Compare this hash with the SHA-256 published in the release notes
+Get-FileHash .\StreamLens.exe -Algorithm SHA256
+
+# Run it
+.\StreamLens.exe
+```
+
+Then open **File → Add Connection…**, enter your bootstrap servers, and
+connect. The [user guide](docs/usage_guide.md) walks you through connecting
+to a cluster and reading your first messages.
 
 > Windows shows a SmartScreen warning on first run. The build is signed, but
 > with a self-signed certificate rather than one from a certificate authority,
 > so Windows has no way to vouch for it. Choose **More info → Run anyway** if
-> you're happy to proceed. To confirm your download really is the file that
-> was published, check its SHA-256 hash against the release notes. There's a
-> walkthrough in [Verifying your download](docs/verification/README.md).
+> you're happy to proceed. The SHA-256 hash is what confirms your download is
+> the file that was published. There's a walkthrough in
+> [Verifying your download](docs/verification/README.md).
 
-**Linux:** expected in the first week of November 2026. Until then there's no
-Linux download.
+### Try it against a local Kafka cluster (Docker)
 
-**macOS:** work in progress, expected in the first week of December 2026.
-Until then there's no macOS download.
+No cluster to hand? The repository includes a disposable Kafka stack with a
+Schema Registry and 13 seeded topics: JSON order, payment, and clickstream
+events, plus Avro and Protobuf topics that decode through the registry.
 
-All builds, including the first Linux and macOS ones, go on the
-[Releases page](https://github.com/getaxtools/StreamLens/releases).
-New here? The [user guide](docs/usage_guide.md) walks you through connecting
-to a cluster and reading your first messages.
+```bash
+git clone https://github.com/getaxtools/StreamLens.git
+cd StreamLens/docker
+docker compose up -d
+docker compose logs -f seed   # wait for it to exit 0
+```
+
+Then add a connection in StreamLens with:
+
+| Field | Value |
+|---|---|
+| Bootstrap servers | `localhost:9092` |
+| Security protocol | `Plaintext` |
+| Schema Registry URL | `http://localhost:8081` |
+| Environment | `Local` |
+
+TLS/SASL and Kerberos variants are in the [local Kafka sandbox](docker/README.md)
+guide. Tear down with `docker compose down -v`.
+
+### macOS and Linux
+
+There's no macOS or Linux download yet, and no Homebrew formula or Linux
+package. The Linux build is expected in the first week of November 2026 and
+the macOS build in the first week of December 2026. Both will go on the
+[Releases page](https://github.com/getaxtools/StreamLens/releases). Watch the
+repository (**Watch → Custom → Releases**) to hear when they land.
 
 ---
 
-## Why StreamLens
+## Key features
 
-Most Kafka UIs are web apps you have to deploy and maintain. The desktop
-alternatives tend to be licensed per seat or built on aging Java toolkits.
-StreamLens Studio is a desktop app that remembers how you work. It runs on
-Windows today, with macOS and Linux builds on the way, and it's free to use,
-including at work.
-
-Three things it does that free desktop clients generally don't:
-
-- **Masking rules applied before display or export.** Pattern or field-path
-  rules redact sensitive values in the message list, the detail pane, and
-  every export. If a pattern rule times out, the value is withheld rather
-  than shown. A rule that fails to compile is skipped with a warning, so check
-  the status bar after saving one. Treat this as display and export hygiene rather
-  than a security boundary, because the full message still comes from the
-  broker. What it does do is keep card numbers off a screen you're sharing.
-
-  <table>
-    <tr>
-      <th>Without a rule</th>
-      <th>With a rule on <code>$.card.number</code></th>
-    </tr>
-    <tr>
-      <td><img src="docs/images/live-tail-unmasked.png" alt="payments topic with full card numbers in the message list and detail pane"></td>
-      <td><img src="docs/images/live-tail-masked.png" alt="the same topic with card numbers masked to their last four digits"></td>
-    </tr>
-  </table>
-
-  <details>
-  <summary>The rule behind it</summary>
-
-  A JsonPath rule scoped to the `payments` topic, replacing the value with a
-  partial mask that leaves the last four characters visible.
-  See [Masking and redaction](docs/masking-and-redaction.md) for every option.
-
-  <img src="docs/images/masking-rule.png" alt="Masking and redaction rules dialog: rule name Card numbers, topic payments, match by JsonPath, pattern $.card.number, replace with PartialMask, 4 trailing characters visible">
-  </details>
-
-- **Production guardrails, with a log you can read.** Tag a cluster
-  `Production` and destructive actions make you type the resource name to
-  confirm. Every change is recorded to a local audit log covering
-  connections, topic creates and deletes, offset moves, and messages
-  published, and **Tools → Audit Log…** lets you filter and export it.
+- **Kafka live tail across all partitions.** New messages stream in as they
+  arrive, from the latest offset or replayed from the earliest, with a topic
+  filter, favorites, and colour-coded groups.
+- **Schema Registry decoding for Avro and Protobuf.** Messages decode against
+  the schema your Confluent Schema Registry holds, with String, pretty-printed
+  JSON, Hex, and Raw views as well. Authenticated registries are supported.
+- **Kafka data masking and PII redaction.** Pattern and JSONPath rules (for
+  example `$.customer.ssn`) redact values in the message list, the detail
+  pane, and every export. If a rule can't be applied, the value is withheld
+  rather than shown.
+- **Search a whole Kafka topic.** Find messages by text, by JSON field path
+  (`$.order.id`), or by timestamp range, scanned on the broker rather than
+  just in what's loaded.
+- **Produce test messages.** Compose a message with key, value, headers, and
+  target partition, or edit and republish an existing one. JSON is checked
+  against the topic's registered Avro schema before it's sent. Values are sent
+  as plain text (see [limitations](#current-limitations)).
+- **Export Kafka messages to CSV, JSON, or zip,** with masking applied and
+  spreadsheet formula injection escaped.
+- **Production guardrails.** Tag a cluster `Production` and destructive
+  actions make you type the resource name to confirm.
+- **A local audit log.** Topic creates and deletes, offset moves, published
+  messages, and connection changes are recorded, and **Tools → Audit Log…**
+  filters and exports them.
+- **Consumer group lag and offset reset** *(not yet stable)*. See per-partition
+  lag and move a group to the start, the end, or a timestamp.
+- **Secure cluster connections.** SASL (including SCRAM), SSL, mutual TLS, a
+  private CA, and Kerberos (GSSAPI, configurable but not yet verified).
+  Multiple saved clusters, with import and export that leaves passwords out.
+  Saved passwords are encrypted with Windows DPAPI.
 - **Per-topic settings that persist.** Format and start position are
   remembered per topic, so reopening one doesn't quietly reset it to raw bytes
   and start-from-beginning.
+- **Diagnostics you can read.** An Output panel shows each connection step
+  with timings, so a slow step doesn't look like a hang. Crashes and failed
+  connections produce a report you preview before filing it as a GitHub issue.
+
+### Masking in action
+
+Most Kafka UIs are web apps you have to deploy and maintain, and the desktop
+alternatives tend to be licensed per seat or built on aging Java toolkits.
+Masking is where StreamLens differs most from other free desktop clients.
+
+<table>
+  <tr>
+    <th>Without a rule</th>
+    <th>With a rule on <code>$.card.number</code></th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/live-tail-unmasked.png" alt="Kafka payments topic in StreamLens with full card numbers in the message list and detail pane"></td>
+    <td><img src="docs/images/live-tail-masked.png" alt="The same Kafka topic with card numbers masked to their last four digits"></td>
+  </tr>
+</table>
+
+<details>
+<summary>The rule behind it</summary>
+
+A JsonPath rule scoped to the `payments` topic, replacing the value with a
+partial mask that leaves the last four characters visible.
+See [Masking and redaction](docs/masking-and-redaction.md) for every option.
+
+<img src="docs/images/masking-rule.png" alt="Masking and redaction rules dialog: rule name Card numbers, topic payments, match by JsonPath, pattern $.card.number, replace with PartialMask, 4 trailing characters visible">
+</details>
+
+A rule that fails to compile is skipped with a warning, so check the status
+bar after saving one. Treat masking as display and export hygiene rather than
+a security boundary, because the full message still comes from the broker.
+What it does do is keep card numbers off a screen you're sharing.
+
+---
+
+## How it works
+
+StreamLens is a self-contained .NET desktop app. There's no backend service,
+agent, or proxy: it talks to your brokers and Schema Registry directly, the
+same way any Kafka client does.
+
+```mermaid
+flowchart LR
+    B[(Kafka brokers)] -->|librdkafka consumer| D[Decoder<br/>String · JSON · Avro · Protobuf · Hex · Raw]
+    SR[(Schema Registry)] -->|schema by ID| D
+    D --> M[In-memory buffer<br/>5,000 messages per topic view]
+    M --> R[Masking rules<br/>pattern · JSONPath]
+    R --> UI[Message list<br/>and detail pane]
+    R --> X[Export<br/>CSV · JSON · zip]
+    UI -. publish, offset moves .-> B
+    UI -. every write .-> A[(Local audit log<br/>SQLite)]
+```
+
+- **Kafka client.** Connections, consuming, producing, and admin calls go
+  through [Confluent.Kafka](https://github.com/confluentinc/confluent-kafka-dotnet),
+  the .NET binding for [librdkafka](https://github.com/confluentinc/librdkafka).
+  Security settings map onto librdkafka's, which is why Kerberos on Windows
+  uses SSPI and your logged-on account.
+- **Decoding.** Avro and Protobuf values are read in Confluent wire format (a
+  magic byte, then a 4-byte schema ID). StreamLens fetches that schema from
+  the registry and decodes with Apache Avro or the registry's `.proto`, so
+  field names, enums, and nested messages come out as real JSON that
+  field-path search and masking can work on. A value that can't be decoded
+  shows `[decode error: …]` plus the raw hex, never a silent fallback.
+- **Masking.** Rules run on the decoded value after it leaves the buffer and
+  before it reaches any view or export. A pattern rule that times out
+  withholds the value.
+- **Storage.** Messages are held in memory only and never written to disk.
+  Connections, settings, per-topic preferences, masking rules, and the audit
+  log live in a local SQLite database. Passwords and key passphrases are
+  encrypted with Windows DPAPI and kept out of that database.
+- **UI.** Built with [Avalonia](https://avaloniaui.net/), a cross-platform UI
+  toolkit, which is what makes the macOS and Linux builds a packaging and
+  secret-store job rather than a rewrite.
+
+The full list of bundled components and their licenses is in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+---
 
 ## How it compares
 
@@ -152,23 +282,17 @@ Conduktor Desktop isn't listed because it has reached end of life, and
 existing installs can no longer sign in. Conduktor now offers the web-based
 Conduktor Console instead.
 
-## Features
+### Compared with command-line tools
 
-| Area | What you get |
-|---|---|
-| **Clusters** | Multiple saved connections, SASL/SSL, connection test, import/export. Passwords are encrypted with Windows DPAPI, never stored in the app's database. |
-| **Topics** | Live tail across all partitions, topic filter, favorites, groups, config and per-partition views with under-replication flagged |
-| **Decoding** | String, JSON with pretty-printing, and Avro and Protobuf via Confluent Schema Registry |
-| **Search** | Text scan, field paths (`$.order.id`), and timestamp ranges, searched across the whole topic rather than just what's loaded |
-| **Producing** | Compose a message with key, value, headers, and target partition, or edit and republish an existing one. Values are sent as plain text, and a JSON value is checked against the topic's registered Avro schema before it's sent. |
-| **Masking** | Pattern and field-path redaction rules, applied everywhere the value is shown or exported |
-| **Export** | CSV, JSON, and a zip of per-message JSON files, with spreadsheet formula-injection escaping |
-| **Brokers & groups** | Broker list, plus consumer groups with state, members, per-partition lag, and offset editing |
-| **Offsets** | Move a group per partition, send every partition to the start or the end, or reset the whole topic to earliest, latest, or a timestamp |
-| **Audit log** | A viewer for every write and destructive action, filterable by cluster, action, or text, with CSV export |
-| **Diagnostics** | An Output panel showing each connection step and refresh as it happens, with timings, so a slow step doesn't look like a hang |
-| **Bug reports** | Crashes and failed connections write a report you can file as a pre-filled GitHub issue, after a preview showing exactly what it contains |
-| **Updates** | Tells you when a new version is out and links straight to the download. Checks once a day, sends nothing about you, and stays quiet when you're offline |
+[kcat](https://github.com/edenhill/kcat) and Kafka's own
+`kafka-console-consumer` are the right tools for scripting and pipelines, and
+StreamLens doesn't try to replace them. Where a GUI helps is the interactive
+part of debugging: scrolling back through what just arrived, opening one
+message as formatted JSON, searching by field, and sharing your screen with
+PII masked. Neither CLI masks fields, and neither keeps per-topic settings or
+an audit log of what you changed.
+
+---
 
 ## Current limitations
 
@@ -265,6 +389,9 @@ the app shows you one in full before it goes anywhere.
   puts it on your clipboard, and opens a pre-filled issue. Nothing leaves your
   machine until you've read it and chosen to send it.
 
+If StreamLens saves you time, a ⭐ on the repository helps other Kafka
+developers find it.
+
 ## Documentation
 
 The full index is in [docs/](docs/README.md).
@@ -283,7 +410,7 @@ The full index is in [docs/](docs/README.md).
 
 - [Local Kafka sandbox](docker/README.md) starts a disposable cluster with
   seeded topics: plaintext, TLS/SASL, and Kerberos stacks
-- [Testing connection types](docs/testing/connections.md) has step-by-step
+- [Testing connection types](docs/testing-connections.md) has step-by-step
   setup for plaintext, mutual TLS, SASL/SCRAM, and an authenticated Schema
   Registry
 - [Testing Avro](docs/testing/avro.md) covers schema evolution, logical types,
