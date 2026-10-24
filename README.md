@@ -82,8 +82,9 @@ to a cluster and reading your first messages.
 ### Try it against a local Kafka cluster (Docker)
 
 No cluster to hand? The repository includes a disposable Kafka stack with a
-Schema Registry and 13 seeded topics: JSON order, payment, and clickstream
-events, plus Avro and Protobuf topics that decode through the registry.
+Schema Registry and 14 seeded topics: JSON order, payment, and clickstream
+events, plus Avro and Protobuf topics that decode through the registry,
+including one with Avro-encoded keys.
 
 ```bash
 git clone https://github.com/getaxtools/StreamLens.git
@@ -119,8 +120,8 @@ repository (**Watch → Custom → Releases**) to hear when they land.
 - **Kafka live tail across all partitions.** New messages stream in as they
   arrive, from the latest offset or replayed from the earliest, with a topic
   filter, favorites, and colour-coded groups.
-- **Schema Registry decoding for Avro and Protobuf.** Messages decode against
-  the schema your Confluent Schema Registry holds, with String, pretty-printed
+- **Schema Registry decoding for Avro and Protobuf.** Keys and values decode
+  against the schemas your Confluent Schema Registry holds, with String, pretty-printed
   JSON, Hex, and Raw views as well. Authenticated registries are supported.
 - **Kafka data masking and PII redaction.** Pattern and JSONPath rules (for
   example `$.customer.ssn`) redact values in the message list, the detail
@@ -210,12 +211,12 @@ flowchart LR
   the .NET binding for [librdkafka](https://github.com/confluentinc/librdkafka).
   Security settings map onto librdkafka's, which is why Kerberos on Windows
   uses SSPI and your logged-on account.
-- **Decoding.** Avro and Protobuf values are read in Confluent wire format (a
-  magic byte, then a 4-byte schema ID). StreamLens fetches that schema from
-  the registry and decodes with Apache Avro or the registry's `.proto`, so
-  field names, enums, and nested messages come out as real JSON that
-  field-path search and masking can work on. A value that can't be decoded
-  shows `[decode error: …]` plus the raw hex, never a silent fallback.
+- **Decoding.** Avro and Protobuf keys and values are read in Confluent wire
+  format (a magic byte, then a 4-byte schema ID). StreamLens fetches each
+  schema from the registry and decodes with Apache Avro or the registry's
+  `.proto`, so field names, enums, and nested messages come out as real JSON
+  that field-path search and masking can work on. A value that can't be
+  decoded shows an error that names the cause, never a silent fallback.
 - **Masking.** Rules run on the decoded value after it leaves the buffer and
   before it reaches any view or export. A pattern rule that times out
   withholds the value.

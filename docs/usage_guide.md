@@ -198,6 +198,14 @@ they're displayed:
 **StreamLens remembers this per topic.** Set `order-created` to `Json` once
 and it opens as `Json` every time after, so you never re-pick it.
 
+**Changing Format re-decodes what's already on screen.** You don't need to
+reload the topic.
+
+**Keys follow the same format.** With `Avro` or `Protobuf` selected, a key
+that was written through the Schema Registry decodes against its own schema
+(the topic's `-key` subject), separately from the value. A plain-text key,
+which is common on topics with Avro values, shows as text.
+
 If a message won't decode, you'll see an error in place of the value rather
 than a crash. For Avro and Protobuf, a message that isn't in the expected
 format says so specifically, which usually means the topic isn't really in
@@ -397,10 +405,11 @@ Set **Format** to `Avro` or `Protobuf`, confirm the values decode on screen,
 then export again. If they don't decode, the Schema Registry URL is missing
 or the registry needs its own login ([Section 2](#2-connecting-to-a-cluster)).
 
-StreamLens never silently falls back to another format. A value it can't
-decode reads `[decode error: …]` followed by the raw hex, so an export that
+StreamLens never silently falls back to another format for a value. A value
+it can't decode reads as an error that names the cause, so an export that
 looks like the block above was taken as `String` rather than having failed to
-decode.
+decode. The one exception is a plain-text key under `Avro` or `Protobuf`,
+which shows as text (see [Section 3](#3-reading-messages)).
 
 If another Kafka tool reports the same message as a **serde fallback**, that's
 a different problem: the record itself is unframed, most likely because it was

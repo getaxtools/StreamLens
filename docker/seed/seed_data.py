@@ -176,6 +176,38 @@ DEVICE_TELEMETRY_SCHEMA = """
 }
 """
 
+# CDC-style topic with an Avro key as well as an Avro value, registered under separate
+# -key/-value subjects so the two carry different schema ids.
+CUSTOMER_CDC_TOPIC = "customer-cdc-avro"
+
+CUSTOMER_CDC_KEY_SCHEMA = """
+{
+  "type": "record",
+  "name": "CustomerKey",
+  "namespace": "com.streamlens.demo.cdc",
+  "fields": [
+    { "name": "customer_id", "type": "int" }
+  ]
+}
+"""
+
+CUSTOMER_CDC_VALUE_SCHEMA = """
+{
+  "type": "record",
+  "name": "Customer",
+  "namespace": "com.streamlens.demo.cdc",
+  "fields": [
+    { "name": "customer_id", "type": "int" },
+    { "name": "name", "type": "string" },
+    { "name": "email", "type": "string" },
+    { "name": "status", "type": "string" },
+    { "name": "source_system", "type": "string" },
+    { "name": "source_version", "type": ["null", "string"], "default": null },
+    { "name": "breadcrumb_id", "type": "string" }
+  ]
+}
+"""
+
 # Confluent's ProtobufSerializer needs the generated module, compiled into the image by the
 # Dockerfile. Imported lazily in the seeder so a protobuf dependency problem can't stop the Avro
 # and JSON topics from seeding.
@@ -194,6 +226,7 @@ TOPIC_SPECS = [
     (HIGH_VOLUME_TOPIC, 3),
     (AVRO_TOPIC, 2),
     (DEVICE_TELEMETRY_TOPIC, 3),
+    (CUSTOMER_CDC_TOPIC, 2),
     (PROTOBUF_TOPIC, 2),
 ]
 
@@ -574,6 +607,41 @@ def seed_device_telemetry(count: int) -> None:
     print(f"[seed] seeded {DEVICE_TELEMETRY_TOPIC} ({count} Avro msgs, round-trip cases)")
 
 
+def seed_customer_cdc(count: int) -> None:
+    """Produces the Avro-keyed CDC topic. Each customer is updated several times, so keys repeat."""
+    registry = SchemaRegistryClient(schema_registry_config())
+    key_serializer = AvroSerializer(registry, CUSTOMER_CDC_KEY_SCHEMA)
+    value_serializer = AvroSerializer(registry, CUSTOMER_CDC_VALUE_SCHEMA)
+    producer = Producer(kafka_config())
+
+    statuses = ["ACTIVE", "ACTIVE", "SUSPENDED", "CLOSED"]
+    source_versions = [None, "1.1", "1.2"]
+
+    for i in range(count):
+        customer_id = 2001 + i % 40
+        key = {"customer_id": customer_id}
+        value = {
+            "customer_id": customer_id,
+            "name": f"Customer {customer_id}",
+            "email": f"customer.{customer_id}@example.com",
+            "status": statuses[i % len(statuses)],
+            "source_system": "SOLIFY",
+            "source_version": source_versions[i % len(source_versions)],
+            "breadcrumb_id": f"BC-CUSTOMER-{customer_id}-{1000 + i}",
+        }
+        producer.produce(
+            topic=CUSTOMER_CDC_TOPIC,
+            key=key_serializer(key, SerializationContext(CUSTOMER_CDC_TOPIC, MessageField.KEY)),
+            value=value_serializer(value, SerializationContext(CUSTOMER_CDC_TOPIC, MessageField.VALUE)),
+        )
+
+    remaining = producer.flush(60)
+    if remaining > 0:
+        print(f"[seed] WARNING: {remaining} customer-cdc messages undelivered")
+        sys.exit(1)
+    print(f"[seed] seeded {CUSTOMER_CDC_TOPIC} ({count} msgs, Avro key and value)")
+
+
 def seed_shipment_events(count: int) -> None:
     """Produces the Protobuf topic through Schema Registry.
 
@@ -671,6 +739,7 @@ def main() -> None:
     for label, seeder in (
         (AVRO_TOPIC, seed_avro_sensor_readings),
         (DEVICE_TELEMETRY_TOPIC, seed_device_telemetry),
+        (CUSTOMER_CDC_TOPIC, seed_customer_cdc),
         (PROTOBUF_TOPIC, seed_shipment_events),
     ):
         try:

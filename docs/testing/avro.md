@@ -4,14 +4,14 @@ How to exercise StreamLens's Schema Registry decoding (Avro and Protobuf)
 against the local Docker stack, including the cases that are supposed to fail.
 This is the app-side walkthrough. For what the stacks start and which ports
 they expose, see [`docker/README.md`](../../docker/README.md), and for connection
-setup see [testing connections](connections.md).
+setup see [testing connections](../testing-connections.md).
 
 Most of it is Avro, which has the wider range of edge cases. Protobuf is
 check 10.
 
 ## Seeding the Avro topics
 
-The default seed run creates two Avro topics and one Protobuf topic. The Avro
+The default seed run creates three Avro topics and one Protobuf topic. The Avro
 edge cases live in a second script that you run on demand:
 
 ```bash
@@ -42,6 +42,7 @@ Seeded by the default run:
 |---|---|---|
 | `sensor-readings-avro` | 200 | Happy path: one schema, flat record, optional field, array |
 | `device-telemetry-avro` | 200 | `timestamp-millis`, enum, `fixed`, `bytes`, nullable `int` and `float`, map, nested record, array of doubles |
+| `customer-cdc-avro` | 200 | Avro key as well as Avro value, each with its own schema id (see check 12) |
 | `shipment-events-proto` | 200 | Protobuf: nested messages, enum, map, repeated field (see check 10) |
 
 Seeded by `seed_avro_edge_cases.py`:
@@ -56,7 +57,7 @@ Seeded by `seed_avro_edge_cases.py`:
 | `avro-unknown-schema-id` | 20 | 1 | **Must fail.** Valid magic, schema id `999999`, never registered |
 
 Registry subjects: `sensor-readings-avro-value`, `device-telemetry-avro-value`,
-`shipment-events-proto-value`, `avro-evolution-value`,
+`customer-cdc-avro-key`, `customer-cdc-avro-value`, `shipment-events-proto-value`, `avro-evolution-value`,
 `avro-logical-types-value`, `avro-complex-value`.
 
 Connect with **Schema Registry URL** `http://localhost:8081` and set the topic
@@ -304,6 +305,22 @@ Two things are specific to Protobuf:
   Avro, not raw bytes.
 - Restart the app. The format should still be remembered.
 - A format set on one Avro topic shouldn't carry over to another.
+
+### 12. Avro keys
+
+Open `customer-cdc-avro` as Avro.
+
+- The **Key** column shows the decoded key on one line, for example
+  `{   "customer_id": 2001 }`, not `[Avro schema N not resolved…]` and not a
+  lone `{`.
+- The key and value decode with different schema ids. Confirm with
+  `curl -s http://localhost:8081/subjects/customer-cdc-avro-key/versions/latest`.
+- **Tools → Find Messages…** with key and value set to Avro finds a search
+  such as `2005`, and its results show decoded keys and values.
+- Switch **Format** to `String`, then back to `Avro`. The grid updates each
+  time, without a reload.
+- Open `sensor-readings-avro` as Avro. Its keys are plain text and still read
+  as `sensor_0001`, not as a framing error.
 
 ## Resetting
 

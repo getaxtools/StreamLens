@@ -14,7 +14,7 @@ All of these run against the disposable Kafka stacks in [`docker/`](../docker/RE
 
 - [Local Kafka sandbox](../docker/README.md) - what each stack starts, its ports, and the seeded
   topics
-- [Connection types](testing/connections.md) - plaintext, mutual TLS, SASL/SCRAM, and an
+- [Connection types](testing-connections.md) - plaintext, mutual TLS, SASL/SCRAM, and an
   authenticated Schema Registry, field by field
 - [Avro](testing/avro.md) - schema evolution, logical types, complex types, and malformed
   payloads
