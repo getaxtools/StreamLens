@@ -82,9 +82,9 @@ to a cluster and reading your first messages.
 ### Try it against a local Kafka cluster (Docker)
 
 No cluster to hand? The repository includes a disposable Kafka stack with a
-Schema Registry and 14 seeded topics: JSON order, payment, and clickstream
+Schema Registry and 15 seeded topics: JSON order, payment, and clickstream
 events, plus Avro and Protobuf topics that decode through the registry,
-including one with Avro-encoded keys.
+including Avro-encoded keys.
 
 ```bash
 git clone https://github.com/getaxtools/StreamLens.git

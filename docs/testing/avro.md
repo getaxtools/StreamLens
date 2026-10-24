@@ -11,7 +11,7 @@ check 10.
 
 ## Seeding the Avro topics
 
-The default seed run creates three Avro topics and one Protobuf topic. The Avro
+The default seed run creates four Avro topics and one Protobuf topic. The Avro
 edge cases live in a second script that you run on demand:
 
 ```bash
@@ -43,6 +43,7 @@ Seeded by the default run:
 | `sensor-readings-avro` | 200 | Happy path: one schema, flat record, optional field, array |
 | `device-telemetry-avro` | 200 | `timestamp-millis`, enum, `fixed`, `bytes`, nullable `int` and `float`, map, nested record, array of doubles |
 | `customer-cdc-avro` | 200 | Avro key as well as Avro value, each with its own schema id (see check 12) |
+| `customer-mixed-keys-avro` | 200 | Avro values with keys that cycle: plain text, Avro, no key (see check 12) |
 | `shipment-events-proto` | 200 | Protobuf: nested messages, enum, map, repeated field (see check 10) |
 
 Seeded by `seed_avro_edge_cases.py`:
@@ -57,7 +58,8 @@ Seeded by `seed_avro_edge_cases.py`:
 | `avro-unknown-schema-id` | 20 | 1 | **Must fail.** Valid magic, schema id `999999`, never registered |
 
 Registry subjects: `sensor-readings-avro-value`, `device-telemetry-avro-value`,
-`customer-cdc-avro-key`, `customer-cdc-avro-value`, `shipment-events-proto-value`, `avro-evolution-value`,
+`customer-cdc-avro-key`, `customer-cdc-avro-value`, `customer-mixed-keys-avro-key`,
+`customer-mixed-keys-avro-value`, `shipment-events-proto-value`, `avro-evolution-value`,
 `avro-logical-types-value`, `avro-complex-value`.
 
 Connect with **Schema Registry URL** `http://localhost:8081` and set the topic
@@ -321,6 +323,9 @@ Open `customer-cdc-avro` as Avro.
   time, without a reload.
 - Open `sensor-readings-avro` as Avro. Its keys are plain text and still read
   as `sensor_0001`, not as a framing error.
+- Open `customer-mixed-keys-avro` as Avro, with **Start** set to `Earliest`.
+  Every value decodes, and the keys repeat a three-row pattern: `cus_3001`, then
+  `{   "customer_id": 3002 }`, then an empty key. No row shows a framing error.
 
 ## Resetting
 

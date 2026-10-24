@@ -72,7 +72,7 @@ docker compose down -v
 | `audit-log` | 1 | 200 | Synthetic audit entries mirroring the app's audit action types |
 | `telemetry-events` | 3 | 5000 | High-volume device-metric readings - for testing virtualized grid scrolling and performance under load |
 
-Four more go through Schema Registry, so they need the **Schema Registry URL**
+Five more go through Schema Registry, so they need the **Schema Registry URL**
 field set (`http://localhost:8081`) and the topic's format set to Avro or
 Protobuf. Viewed as String they look like binary, which is correct:
 
@@ -80,7 +80,8 @@ Protobuf. Viewed as String they look like binary, which is correct:
 |---|---|---|---|---|
 | `sensor-readings-avro` | 2 | 200 | Avro | Flat record with a nullable field and an array - everyday Avro decoding |
 | `device-telemetry-avro` | 3 | 200 | Avro | Logical types (`timestamp-millis`), an enum, `fixed`, `bytes`, two nullable numeric unions, a map, a nested record, and an array of doubles |
-| `customer-cdc-avro` | 2 | 200 | Avro | CDC-style, with an Avro **key** as well as an Avro value - the only registry-encoded key in the set. Key and value use separate `-key` / `-value` subjects, so they carry different schema ids |
+| `customer-cdc-avro` | 2 | 200 | Avro | CDC-style, with an Avro **key** as well as an Avro value. Key and value use separate `-key` / `-value` subjects, so they carry different schema ids |
+| `customer-mixed-keys-avro` | 1 | 200 | Avro | Avro values whose keys cycle from message to message: plain text (`cus_3001`), an Avro key, then no key. Tests that each key is decoded on its own |
 | `shipment-events-proto` | 2 | 200 | Protobuf | Nested messages, an enum, a map, and a repeated field, produced through Confluent's `ProtobufSerializer` |
 
 `device-telemetry-avro` carries the shapes where the decoded JSON drops

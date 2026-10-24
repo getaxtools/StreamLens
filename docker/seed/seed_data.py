@@ -208,6 +208,10 @@ CUSTOMER_CDC_VALUE_SCHEMA = """
 }
 """
 
+# Same records as CUSTOMER_CDC_TOPIC, but the key cycles between plain text, Avro and no key,
+# so key decoding is exercised per message rather than per topic.
+MIXED_KEYS_TOPIC = "customer-mixed-keys-avro"
+
 # Confluent's ProtobufSerializer needs the generated module, compiled into the image by the
 # Dockerfile. Imported lazily in the seeder so a protobuf dependency problem can't stop the Avro
 # and JSON topics from seeding.
@@ -227,6 +231,7 @@ TOPIC_SPECS = [
     (AVRO_TOPIC, 2),
     (DEVICE_TELEMETRY_TOPIC, 3),
     (CUSTOMER_CDC_TOPIC, 2),
+    (MIXED_KEYS_TOPIC, 1),
     (PROTOBUF_TOPIC, 2),
 ]
 
@@ -607,6 +612,20 @@ def seed_device_telemetry(count: int) -> None:
     print(f"[seed] seeded {DEVICE_TELEMETRY_TOPIC} ({count} Avro msgs, round-trip cases)")
 
 
+def customer_record(customer_id: int, i: int) -> dict:
+    statuses = ["ACTIVE", "ACTIVE", "SUSPENDED", "CLOSED"]
+    source_versions = [None, "1.1", "1.2"]
+    return {
+        "customer_id": customer_id,
+        "name": f"Customer {customer_id}",
+        "email": f"customer.{customer_id}@example.com",
+        "status": statuses[i % len(statuses)],
+        "source_system": "SOLIFY",
+        "source_version": source_versions[i % len(source_versions)],
+        "breadcrumb_id": f"BC-CUSTOMER-{customer_id}-{1000 + i}",
+    }
+
+
 def seed_customer_cdc(count: int) -> None:
     """Produces the Avro-keyed CDC topic. Each customer is updated several times, so keys repeat."""
     registry = SchemaRegistryClient(schema_registry_config())
@@ -614,25 +633,12 @@ def seed_customer_cdc(count: int) -> None:
     value_serializer = AvroSerializer(registry, CUSTOMER_CDC_VALUE_SCHEMA)
     producer = Producer(kafka_config())
 
-    statuses = ["ACTIVE", "ACTIVE", "SUSPENDED", "CLOSED"]
-    source_versions = [None, "1.1", "1.2"]
-
     for i in range(count):
         customer_id = 2001 + i % 40
-        key = {"customer_id": customer_id}
-        value = {
-            "customer_id": customer_id,
-            "name": f"Customer {customer_id}",
-            "email": f"customer.{customer_id}@example.com",
-            "status": statuses[i % len(statuses)],
-            "source_system": "SOLIFY",
-            "source_version": source_versions[i % len(source_versions)],
-            "breadcrumb_id": f"BC-CUSTOMER-{customer_id}-{1000 + i}",
-        }
         producer.produce(
             topic=CUSTOMER_CDC_TOPIC,
-            key=key_serializer(key, SerializationContext(CUSTOMER_CDC_TOPIC, MessageField.KEY)),
-            value=value_serializer(value, SerializationContext(CUSTOMER_CDC_TOPIC, MessageField.VALUE)),
+            key=key_serializer({"customer_id": customer_id}, SerializationContext(CUSTOMER_CDC_TOPIC, MessageField.KEY)),
+            value=value_serializer(customer_record(customer_id, i), SerializationContext(CUSTOMER_CDC_TOPIC, MessageField.VALUE)),
         )
 
     remaining = producer.flush(60)
@@ -640,6 +646,34 @@ def seed_customer_cdc(count: int) -> None:
         print(f"[seed] WARNING: {remaining} customer-cdc messages undelivered")
         sys.exit(1)
     print(f"[seed] seeded {CUSTOMER_CDC_TOPIC} ({count} msgs, Avro key and value)")
+
+
+def seed_mixed_keys(count: int) -> None:
+    """Produces Avro values whose keys cycle: plain text, Avro, then no key."""
+    registry = SchemaRegistryClient(schema_registry_config())
+    key_serializer = AvroSerializer(registry, CUSTOMER_CDC_KEY_SCHEMA)
+    value_serializer = AvroSerializer(registry, CUSTOMER_CDC_VALUE_SCHEMA)
+    producer = Producer(kafka_config())
+
+    for i in range(count):
+        customer_id = 3001 + i % 20
+        if i % 3 == 0:
+            key = f"cus_{customer_id}".encode("utf-8")
+        elif i % 3 == 1:
+            key = key_serializer({"customer_id": customer_id}, SerializationContext(MIXED_KEYS_TOPIC, MessageField.KEY))
+        else:
+            key = None
+        producer.produce(
+            topic=MIXED_KEYS_TOPIC,
+            key=key,
+            value=value_serializer(customer_record(customer_id, i), SerializationContext(MIXED_KEYS_TOPIC, MessageField.VALUE)),
+        )
+
+    remaining = producer.flush(60)
+    if remaining > 0:
+        print(f"[seed] WARNING: {remaining} mixed-keys messages undelivered")
+        sys.exit(1)
+    print(f"[seed] seeded {MIXED_KEYS_TOPIC} ({count} msgs, Avro values, text/Avro/no keys)")
 
 
 def seed_shipment_events(count: int) -> None:
@@ -740,6 +774,7 @@ def main() -> None:
         (AVRO_TOPIC, seed_avro_sensor_readings),
         (DEVICE_TELEMETRY_TOPIC, seed_device_telemetry),
         (CUSTOMER_CDC_TOPIC, seed_customer_cdc),
+        (MIXED_KEYS_TOPIC, seed_mixed_keys),
         (PROTOBUF_TOPIC, seed_shipment_events),
     ):
         try:
@@ -754,7 +789,10 @@ def main() -> None:
         f"audit-log ({MESSAGES_PER_TOPIC} msgs each) and {HIGH_VOLUME_TOPIC} "
         f"({HIGH_VOLUME_MESSAGE_COUNT} msgs); every JSON message >= {MIN_MESSAGE_BYTES} bytes"
     )
-    seeded = [t for t in (AVRO_TOPIC, DEVICE_TELEMETRY_TOPIC, PROTOBUF_TOPIC) if t not in skipped]
+    seeded = [
+        t for t in (AVRO_TOPIC, DEVICE_TELEMETRY_TOPIC, CUSTOMER_CDC_TOPIC, MIXED_KEYS_TOPIC, PROTOBUF_TOPIC)
+        if t not in skipped
+    ]
     if seeded:
         print(f"[seed] registry-backed topics seeded: {', '.join(seeded)}")
     if skipped:
