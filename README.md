@@ -27,10 +27,11 @@ list and the detail pane.*
 
 ▶️ **[Watch the overview video](docs/videos/streamLens-Marketing.mp4)** (MP4, 8.7 MB)
 
-> **Status: v0.8.0, pre-release.** Stable: cluster connections, topic browsing
+> **Status: v0.9.0, pre-release.** Stable: cluster connections, topic browsing
 > and live tail, decoding, search, publishing, masking, export, the audit log,
-> diagnostics, bug reports and update checks. Not yet stable: the consumer
-> groups view, including lag and offset moves. Windows only for now: Linux is
+> diagnostics, bug reports and update checks. New in v0.9.0: settings that IT
+> administrators enforce through Group Policy or Intune. Not yet stable: the
+> consumer groups view, including lag and offset moves. Windows only for now: Linux is
 > expected in the first week of November 2026 and macOS in the first week of
 > December 2026. We're also preparing to open-source StreamLens under GPL-3.0,
 > so stay tuned for updates. There are real gaps, so read
@@ -138,6 +139,10 @@ repository (**Watch → Custom → Releases**) to hear when they land.
   spreadsheet formula injection escaped.
 - **Production guardrails.** Tag a cluster `Production` and destructive
   actions make you type the resource name to confirm.
+- **Managed settings for IT teams.** With Group Policy or Intune,
+  administrators can make connections read-only by environment, require TLS
+  certificate verification, stop passwords from being saved, and turn off
+  update checks and issue reporting. See [Managed settings](docs/managed-settings.md).
 - **A local audit log.** Topic creates and deletes, offset moves, published
   messages, and connection changes are recorded, and **Tools → Audit Log…**
   filters and exports them.
@@ -266,7 +271,7 @@ well as where it's ahead.
 | **Protecting data** | | | | |
 | Field masking | ✅ Pattern and JSONPath | ✅ Remove, replace, mask | ✅ Regex and JSON fields | ❔ |
 | Audit log | ✅ Local, with a viewer | ✅ Kafka topic or console | ✅ Kafka topic | ❔ |
-| Production guardrails | ✅ Type the name to confirm | ✅ Read-only mode | ✅ Read-only role | ❔ |
+| Production guardrails | ✅ Type the name to confirm; read-only by policy | ✅ Read-only mode | ✅ Read-only role | ❔ |
 | Export messages | ✅ CSV, JSON, zip | ✅ CSV, JSON | 🟡 JSON only | 🟡 Raw binary |
 | **Operating the cluster** | | | | |
 | Consumer groups with lag | 🟡 Not yet stable | ✅ | ✅ | ✅ |
@@ -320,6 +325,10 @@ Being upfront so you don't waste a download:
   builds ship.
 - **Single user.** No logins or roles of its own, so your operating-system
   account is the access boundary.
+- **Managed settings are a client-side safeguard.** A read-only connection in
+  StreamLens doesn't stop someone writing to the cluster with another client,
+  so use Kafka ACLs to control access. Read-only also follows the environment
+  label, which users choose for each connection.
 
 ## Roadmap
 
@@ -351,6 +360,9 @@ the latest released version is. It sends nothing about you, your machine, or
 your clusters, and it does nothing at all when you're offline. There's more
 detail in
 [Keeping StreamLens up to date](docs/usage_guide.md#11-keeping-streamlens-up-to-date).
+If your organization manages StreamLens, an administrator can turn the update
+check off. Managed settings are read from
+`HKEY_LOCAL_MACHINE\SOFTWARE\Policies\StreamLens` and never sent anywhere.
 
 ```
 %LocalAppData%\StreamLensStudio\
@@ -388,7 +400,8 @@ the app shows you one in full before it goes anywhere.
 - **From inside the app:** after a crash or a failed connection, the
   **Report this** button does most of the work. It shows you the full report,
   puts it on your clipboard, and opens a pre-filled issue. Nothing leaves your
-  machine until you've read it and chosen to send it.
+  machine until you've read it and chosen to send it. If your organization
+  has turned issue reporting off, the button doesn't appear.
 
 If StreamLens saves you time, a ⭐ on the repository helps other Kafka
 developers find it.
@@ -406,6 +419,12 @@ The full index is in [docs/](docs/README.md).
 - [Verifying your download](docs/verification/README.md) walks through
   checking the SHA-256 hash, and what the code signature does and doesn't
   prove
+
+**Rolling it out to a team**
+
+- [Managed settings](docs/managed-settings.md) explains how administrators
+  enforce settings with Group Policy or Intune, using the templates in
+  [policy/](policy/)
 
 **Trying it against a local Kafka**
 

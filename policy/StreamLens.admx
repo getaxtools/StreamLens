@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitions xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   revision="1.0" schemaVersion="1.0"
+                   xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="streamlens" namespace="getaxtools.Policies.StreamLens" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_StreamLens" displayName="$(string.SUPPORTED_StreamLens)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="StreamLens" displayName="$(string.Category_StreamLens)" />
+  </categories>
+  <policies>
+    <policy name="DisableUpdateCheck" class="Both"
+            displayName="$(string.DisableUpdateCheck)" explainText="$(string.DisableUpdateCheck_Explain)"
+            key="SOFTWARE\Policies\StreamLens" valueName="DisableUpdateCheck">
+      <parentCategory ref="StreamLens" />
+      <supportedOn ref="SUPPORTED_StreamLens" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="DisableIssueReporting" class="Both"
+            displayName="$(string.DisableIssueReporting)" explainText="$(string.DisableIssueReporting_Explain)"
+            key="SOFTWARE\Policies\StreamLens" valueName="DisableIssueReporting">
+      <parentCategory ref="StreamLens" />
+      <supportedOn ref="SUPPORTED_StreamLens" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="DisallowSkipTlsVerification" class="Both"
+            displayName="$(string.DisallowSkipTlsVerification)" explainText="$(string.DisallowSkipTlsVerification_Explain)"
+            key="SOFTWARE\Policies\StreamLens" valueName="DisallowSkipTlsVerification">
+      <parentCategory ref="StreamLens" />
+      <supportedOn ref="SUPPORTED_StreamLens" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="DisallowSavedPasswords" class="Both"
+            displayName="$(string.DisallowSavedPasswords)" explainText="$(string.DisallowSavedPasswords_Explain)"
+            key="SOFTWARE\Policies\StreamLens" valueName="DisallowSavedPasswords">
+      <parentCategory ref="StreamLens" />
+      <supportedOn ref="SUPPORTED_StreamLens" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="ReadOnlyEnvironments" class="Both"
+            displayName="$(string.ReadOnlyEnvironments)" explainText="$(string.ReadOnlyEnvironments_Explain)"
+            presentation="$(presentation.ReadOnlyEnvironments)"
+            key="SOFTWARE\Policies\StreamLens">
+      <parentCategory ref="StreamLens" />
+      <supportedOn ref="SUPPORTED_StreamLens" />
+      <elements>
+        <boolean id="ReadOnlyLocal" valueName="ReadOnlyLocal">
+          <trueValue><decimal value="1" /></trueValue>
+          <falseValue><decimal value="0" /></falseValue>
+        </boolean>
+        <boolean id="ReadOnlyDevelopment" valueName="ReadOnlyDevelopment">
+          <trueValue><decimal value="1" /></trueValue>
+          <falseValue><decimal value="0" /></falseValue>
+        </boolean>
+        <boolean id="ReadOnlyStaging" valueName="ReadOnlyStaging">
+          <trueValue><decimal value="1" /></trueValue>
+          <falseValue><decimal value="0" /></falseValue>
+        </boolean>
+        <boolean id="ReadOnlyProduction" valueName="ReadOnlyProduction">
+          <trueValue><decimal value="1" /></trueValue>
+          <falseValue><decimal value="0" /></falseValue>
+        </boolean>
+      </elements>
+    </policy>
+  </policies>
+</policyDefinitions>

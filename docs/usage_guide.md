@@ -201,10 +201,10 @@ and it opens as `Json` every time after, so you never re-pick it.
 **Changing Format re-decodes what's already on screen.** You don't need to
 reload the topic.
 
-**Keys follow the same format.** With `Avro` or `Protobuf` selected, a key
-that was written through the Schema Registry decodes against its own schema
-(the topic's `-key` subject), separately from the value. A plain-text key,
-which is common on topics with Avro values, shows as text.
+**Keys decode on their own.** A key that was written through the Schema
+Registry decodes against its own schema (the topic's `-key` subject) under any
+format except `Hex` and `Raw`, so an Avro key next to a JSON value decodes too.
+A plain-text key, which is common on topics with Avro values, shows as text.
 
 If a message won't decode, you'll see an error in place of the value rather
 than a crash. For Avro and Protobuf, a message that isn't in the expected

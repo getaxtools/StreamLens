@@ -7,6 +7,8 @@
 - [Masking and redaction](masking-and-redaction.md) - writing and testing redaction rules
 - [Verifying your download](verification/README.md) - checking the SHA-256 hash and the code
   signature
+- [Managed settings](managed-settings.md) - enforcing settings across a team with Group Policy
+  or Intune
 
 ## Testing your own scenarios
 

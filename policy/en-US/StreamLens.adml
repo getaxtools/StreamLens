@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                           revision="1.0" schemaVersion="1.0"
+                           xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>StreamLens Studio</displayName>
+  <description>Policy settings for StreamLens Studio, a desktop client for Apache Kafka.</description>
+  <resources>
+    <stringTable>
+      <string id="Category_StreamLens">StreamLens Studio</string>
+      <string id="SUPPORTED_StreamLens">StreamLens Studio 0.9.0 or later</string>
+
+      <string id="DisableUpdateCheck">Turn off update checks</string>
+      <string id="DisableUpdateCheck_Explain">If you enable this setting, StreamLens Studio doesn't contact GitHub to check for a newer release, and Help &gt; Check for Updates is hidden.
+
+If you disable or don't configure this setting, StreamLens Studio checks for updates once a day and users can check manually.</string>
+
+      <string id="DisableIssueReporting">Turn off reporting issues to GitHub</string>
+      <string id="DisableIssueReporting_Explain">If you enable this setting, StreamLens Studio hides the "Report this crash" button and the "Report this..." button shown after a failed connection. These actions copy a report that can include cluster host names and user names, and open a GitHub issue form in the browser.
+
+Crash reports are still written to the local data folder.
+
+If you disable or don't configure this setting, users can prepare and share these reports.</string>
+
+      <string id="DisallowSkipTlsVerification">Require TLS certificate verification</string>
+      <string id="DisallowSkipTlsVerification_Explain">If you enable this setting, StreamLens Studio always verifies broker and Schema Registry certificates. The "Skip certificate verification" option in the connection editor is turned off, and saved connections that have it selected connect with verification on.
+
+If you disable or don't configure this setting, users can choose to skip certificate verification for a connection.</string>
+
+      <string id="DisallowSavedPasswords">Don't save connection passwords</string>
+      <string id="DisallowSavedPasswords_Explain">If you enable this setting, StreamLens Studio doesn't store SASL, client key or Schema Registry passwords in the Windows credential store. Passwords that users enter are kept in memory until StreamLens Studio closes, and users enter them again in the next session. StreamLens Studio asks for a missing SASL or Schema Registry password when users connect; a client key password must be entered again in the connection editor. Passwords saved before this setting applied are not used.
+
+If you disable or don't configure this setting, passwords are saved in the Windows credential store (DPAPI) for the signed-in user.</string>
+
+      <string id="ReadOnlyEnvironments">Make connections read-only</string>
+      <string id="ReadOnlyEnvironments_Explain">If you enable this setting, connections in the selected environments are read-only: users can browse topics, messages, brokers and consumer groups, but can't publish or republish messages, create or delete topics, or move or reset consumer group offsets.
+
+The environment is a label that users choose for each connection in the connection editor. To make every connection read-only regardless of its label, select all four environments.
+
+If you disable or don't configure this setting, no connection is read-only.
+
+This setting is a client-side safeguard. To enforce access, use Kafka ACLs on the cluster.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="ReadOnlyEnvironments">
+        <text>Make connections in these environments read-only:</text>
+        <checkBox refId="ReadOnlyLocal" defaultChecked="false">Local</checkBox>
+        <checkBox refId="ReadOnlyDevelopment" defaultChecked="false">Development</checkBox>
+        <checkBox refId="ReadOnlyStaging" defaultChecked="false">Staging</checkBox>
+        <checkBox refId="ReadOnlyProduction" defaultChecked="true">Production</checkBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>
